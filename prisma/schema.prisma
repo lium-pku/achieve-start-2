@@ -1,0 +1,135 @@
+// 小学生时间管理小程序 - 数据模型
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 家庭成员（孩子 / 妈妈 / 爸爸）
+model Member {
+  id          String   @id @default(cuid())
+  name        String
+  role        String   // "child" | "mom" | "dad"
+  avatar      String   @default("🧒")
+  color       String   @default("#FF9A3C") // 头像背景色
+  totalPoints Int      @default(0)         // 累计可用积分（实时维护）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activityLogs      ActivityLog[]
+  pointTransactions PointTransaction[]
+  redemptions       RewardRedemption[]
+  createdActivities Activity[]      @relation("CreatedActivities")
+  assignedActivities Activity[]     @relation("AssignedActivities")
+  createdRewards    Reward[]
+}
+
+// 活动 / 日程条目
+model Activity {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  // 日度 / 周度 / 月度
+  scheduleType  String   // "daily" | "weekly" | "monthly"
+  // 周度：1-7（周一到周日），月度：1-31（每月几号），日度：null
+  dayOfWeek     Int?
+  dayOfMonth    Int?
+  // 计划时间（HH:mm 字符串）
+  scheduledTime String?
+  // 完成基础积分
+  points        Int      @default(1)
+  // 按时完成额外奖励
+  onTimeBonus   Int      @default(1)
+  // 截止时间（HH:mm），超过则视为未按时
+  deadline      String?
+  // 周期开始日期
+  startDate     DateTime @default(now())
+  active        Boolean  @default(true)
+  createdById   String
+  assignedToId  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdBy     Member   @relation("CreatedActivities", fields: [createdById], references: [id])
+  assignedTo    Member?  @relation("AssignedActivities", fields: [assignedToId], references: [id])
+  logs          ActivityLog[]
+}
+
+// 活动完成记录
+model ActivityLog {
+  id             String   @id @default(cuid())
+  activityId     String
+  memberId       String   // 完成的孩子 id
+  // 该次活动的"实例日期"（日度=当天，周度=那一周的日期，月度=那个月）
+  occurrenceDate DateTime
+  status         String   // "completed" | "missed" | "pending"
+  onTime         Boolean  @default(false)
+  pointsAwarded  Int      @default(0)
+  bonusAwarded   Int      @default(0)
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  activity       Activity @relation(fields: [activityId], references: [id])
+  member         Member   @relation(fields: [memberId], references: [id])
+
+  @@unique([activityId, memberId, occurrenceDate])
+}
+
+// 积分流水
+model PointTransaction {
+  id          String   @id @default(cuid())
+  memberId    String
+  amount      Int      // 正数=获得，负数=扣除/兑换
+  type        String   // "earn" | "bonus" | "penalty" | "redeem" | "adjust"
+  reason      String
+  activityId  String?
+  createdAt   DateTime @default(now())
+
+  member      Member   @relation(fields: [memberId], references: [id])
+}
+
+// 奖励兑换项目
+model Reward {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  icon        String   @default("🎁")
+  pointsCost  Int
+  active      Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy   Member            @relation(fields: [createdById], references: [id])
+  redemptions RewardRedemption[]
+}
+
+// 兑换记录
+model RewardRedemption {
+  id         String   @id @default(cuid())
+  rewardId   String
+  memberId   String
+  status     String   @default("pending") // "pending" | "approved" | "rejected" | "fulfilled"
+  pointsSpent Int
+  note       String?
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+  resolvedById String?
+
+  reward     Reward   @relation(fields: [rewardId], references: [id])
+  member     Member   @relation(fields: [memberId], references: [id])
+}
+
+// 鼓励阈值
+model Encouragement {
+  id          String   @id @default(cuid())
+  threshold   Int      // 达到该累计积分触发
+  title       String
+  message     String
+  icon        String   @default("🌟")
+  createdAt   DateTime @default(now())
+}
