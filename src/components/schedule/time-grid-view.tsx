@@ -146,7 +146,6 @@ export function TimeGridView({
 }: Props) {
   const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
   const containerRef = useRef<HTMLDivElement>(null)
-  const [dragState, setDragState] = useState<DragState | null>(null)
   const [saving, setSaving] = useState<string | null>(null)
   const [hoverTime, setHoverTime] = useState<{ id: string; start: string; end: string } | null>(null)
 
@@ -171,11 +170,21 @@ export function TimeGridView({
 
   const pxToMin = useCallback((px: number) => (px / HOUR_PX) * 60, [])
 
+  // 用 ref 存储 dragState，避免 React 闭包陷阱（连续 move 事件读到旧 state）
+  const dragStateRef = useRef<DragState | null>(null)
+  const [, forceRender] = useState(0)
+  // 用 ref 记录刚结束的拖拽（避免 click 紧跟着触发）
+  const justDraggedRef = useRef(false)
+
+  const setDragState = (s: DragState | null) => {
+    dragStateRef.current = s
+    forceRender((n) => n + 1)
+  }
+  const dragState = dragStateRef.current
+
   const handlePointerDown = (e: React.PointerEvent, activity: Activity) => {
     if (!isParent) return
-    e.preventDefault()
-    e.stopPropagation()
-    ;(e.target as Element).setPointerCapture?.(e.pointerId)
+    // 不阻止默认行为，不 capture，让 click 能正常触发
     setDragState({
       activityId: activity.id,
       startY: e.clientY,
@@ -185,16 +194,22 @@ export function TimeGridView({
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!dragState) return
-    const dy = e.clientY - dragState.startY
-    const dmin = pxToMin(dy)
-    if (Math.abs(dy) > DRAG_THRESHOLD && !dragState.moved) {
-      setDragState({ ...dragState, moved: true })
+    const ds = dragStateRef.current
+    if (!ds) return
+    const dy = e.clientY - ds.startY
+    if (Math.abs(dy) <= DRAG_THRESHOLD) return
+    // 超过阈值，开始真正的拖拽
+    if (!ds.moved) {
+      ds.moved = true
+      // 现在 capture pointer，确保后续 move/up 都能收到
+      ;(e.target as Element).setPointerCapture?.(e.pointerId)
     }
+    const dmin = pxToMin(dy)
     const snapped = Math.round(dmin / 5) * 5
-    setDragState({ ...dragState, deltaMin: snapped })
+    ds.deltaMin = snapped
+    forceRender((n) => n + 1)
 
-    const activity = activities.find((a) => a.id === dragState.activityId)
+    const activity = activities.find((a) => a.id === ds.activityId)
     if (activity) {
       const s = timeToMin(activity.scheduledTime)!
       const d = timeToMin(activity.deadline) ?? s + 60
@@ -207,21 +222,28 @@ export function TimeGridView({
   }
 
   const handlePointerUp = async (e: React.PointerEvent) => {
-    if (!dragState) return
+    const ds = dragStateRef.current
+    if (!ds) return
     ;(e.target as Element).releasePointerCapture?.(e.pointerId)
 
-    const wasMoved = dragState.moved
-    const deltaMin = dragState.deltaMin
-    const activityId = dragState.activityId
+    const wasMoved = ds.moved
+    const deltaMin = ds.deltaMin
+    const activityId = ds.activityId
     setDragState(null)
     setHoverTime(null)
 
     if (!wasMoved || deltaMin === 0) {
-      const a = activities.find((x) => x.id === activityId)
-      if (a) onActivityClick(a)
+      // 不是拖拽，让 onClick 来处理打开详情
       return
     }
 
+    // 标记刚结束拖拽，阻止紧随的 click 事件
+    justDraggedRef.current = true
+    setTimeout(() => {
+      justDraggedRef.current = false
+    }, 100)
+
+    // 拖拽结束，调用 API
     const activity = activities.find((a) => a.id === activityId)
     if (!activity) return
     const newStart = Math.max(0, (timeToMin(activity.scheduledTime) ?? 0) + deltaMin)
@@ -242,6 +264,12 @@ export function TimeGridView({
     } finally {
       setSaving(null)
     }
+  }
+
+  // 点击打开详情（如果是拖拽刚结束则忽略）
+  const handleClick = (a: Activity) => {
+    if (justDraggedRef.current) return
+    onActivityClick(a)
   }
 
   // 渲染单个活动条（纵向布局）
@@ -294,6 +322,7 @@ export function TimeGridView({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onClick={() => handleClick(a)}
         title={`${a.title} ${a.scheduledTime}-${a.deadline || minToTime(s + 60)}`}
       >
         <div className="flex items-center gap-1 shrink-0">
