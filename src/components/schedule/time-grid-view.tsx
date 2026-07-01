@@ -1,20 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   Activity,
-  ActivityWithLog,
-  Member,
   SCHEDULE_LABEL,
-  WEEKDAY_LABEL,
   api,
 } from '@/lib/types'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import {
-  Clock,
   Sparkles,
   CheckCircle2,
   AlertTriangle,
@@ -26,12 +19,9 @@ import { toast } from 'sonner'
 interface Props {
   activities: Activity[]
   todayLogs: Record<string, any>
-  currentMember: Member
-  /** 重新加载数据 */
+  currentMember: any
   onReload: () => void
-  /** 打开活动详情 */
   onActivityClick: (a: Activity) => void
-  /** 打开编辑对话框 */
   onActivityEdit?: (a: Activity) => void
 }
 
@@ -49,13 +39,13 @@ function minToTime(min: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-// 每小时像素宽度
-const HOUR_PX = 80
-// 每行高度
-const BAR_HEIGHT = 52
-// 行间距
-const ROW_GAP = 8
-// 拖拽触发阈值（移动超过该距离才视为拖拽）
+// 每小时像素高度
+const HOUR_PX = 64
+// 活动条最小高度
+const MIN_BAR_HEIGHT = 32
+// 左侧时间标签宽度
+const TIME_LABEL_WIDTH = 52
+// 拖拽触发阈值
 const DRAG_THRESHOLD = 5
 
 // 计算智能时间范围
@@ -76,13 +66,11 @@ function getTimeRange(activities: Activity[]): { start: number; end: number } {
   if (max === 0) {
     return { start: 7 * 60, end: 22 * 60 }
   }
-  // 留 30 分钟边距，并按小时对齐
   const start = Math.max(0, Math.floor((min - 30) / 60) * 60)
   const end = Math.min(24 * 60, Math.ceil((max + 30) / 60) * 60)
   return { start, end }
 }
 
-// 重叠分组算法
 interface ActivityGroup {
   activities: Activity[]
   laneCount: number
@@ -116,9 +104,9 @@ function groupOverlapping(activities: Activity[]): ActivityGroup[] {
     groups.push({ activities: currentGroup, laneCount: currentGroup.length })
   }
 
-  // 给每个活动分配 lane（同一组内并排）
+  // 给每个活动分配 lane
   for (const g of groups) {
-    const lanes: number[] = [] // 每个 lane 当前已占用的结束时间
+    const lanes: number[] = []
     g.activities.forEach((a) => {
       const s = timeToMin(a.scheduledTime)!
       const e = timeToMin(a.deadline) ?? s + 60
@@ -144,7 +132,7 @@ function groupOverlapping(activities: Activity[]): ActivityGroup[] {
 
 interface DragState {
   activityId: string
-  startX: number
+  startY: number
   deltaMin: number
   moved: boolean
 }
@@ -162,10 +150,9 @@ export function TimeGridView({
   const [saving, setSaving] = useState<string | null>(null)
   const [hoverTime, setHoverTime] = useState<{ id: string; start: string; end: string } | null>(null)
 
-  // 计算时间范围和分组
   const { start: rangeStart, end: rangeEnd } = useMemo(() => getTimeRange(activities), [activities])
   const totalMin = rangeEnd - rangeStart
-  const totalWidth = (totalMin / 60) * HOUR_PX
+  const totalHeight = (totalMin / 60) * HOUR_PX
 
   const hours = useMemo(() => {
     const arr: number[] = []
@@ -177,7 +164,6 @@ export function TimeGridView({
 
   const groups = useMemo(() => groupOverlapping(activities), [activities])
 
-  // 未设定时间的活动（无法放在网格上）
   const untimedActivities = useMemo(
     () => activities.filter((a) => !a.scheduledTime),
     [activities]
@@ -185,16 +171,14 @@ export function TimeGridView({
 
   const pxToMin = useCallback((px: number) => (px / HOUR_PX) * 60, [])
 
-  // 拖拽逻辑
   const handlePointerDown = (e: React.PointerEvent, activity: Activity) => {
     if (!isParent) return
     e.preventDefault()
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
-
     setDragState({
       activityId: activity.id,
-      startX: e.clientX,
+      startY: e.clientY,
       deltaMin: 0,
       moved: false,
     })
@@ -202,16 +186,14 @@ export function TimeGridView({
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!dragState) return
-    const dx = e.clientX - dragState.startX
-    const dmin = pxToMin(dx)
-    if (Math.abs(dx) > DRAG_THRESHOLD && !dragState.moved) {
+    const dy = e.clientY - dragState.startY
+    const dmin = pxToMin(dy)
+    if (Math.abs(dy) > DRAG_THRESHOLD && !dragState.moved) {
       setDragState({ ...dragState, moved: true })
     }
-    // 按 5 分钟对齐
     const snapped = Math.round(dmin / 5) * 5
     setDragState({ ...dragState, deltaMin: snapped })
 
-    // 更新 hover 时间提示
     const activity = activities.find((a) => a.id === dragState.activityId)
     if (activity) {
       const s = timeToMin(activity.scheduledTime)!
@@ -235,13 +217,11 @@ export function TimeGridView({
     setHoverTime(null)
 
     if (!wasMoved || deltaMin === 0) {
-      // 视为点击
       const a = activities.find((x) => x.id === activityId)
       if (a) onActivityClick(a)
       return
     }
 
-    // 拖拽结束，调用 API
     const activity = activities.find((a) => a.id === activityId)
     if (!activity) return
     const newStart = Math.max(0, (timeToMin(activity.scheduledTime) ?? 0) + deltaMin)
@@ -264,17 +244,16 @@ export function TimeGridView({
     }
   }
 
-  // 渲染单个活动条
+  // 渲染单个活动条（纵向布局）
   const renderBar = (a: Activity, laneCount: number) => {
     const s = timeToMin(a.scheduledTime)!
     const e = timeToMin(a.deadline) ?? s + 60
-    const left = ((s - rangeStart) / 60) * HOUR_PX
-    const width = Math.max(40, ((e - s) / 60) * HOUR_PX)
+    const top = ((s - rangeStart) / 60) * HOUR_PX
+    const height = Math.max(MIN_BAR_HEIGHT, ((e - s) / 60) * HOUR_PX - 2)
     const lane = (a as any)._lane || 0
-    const laneWidth = (totalWidth - left) / laneCount // 简化：剩余宽度均分
-    // 实际并排时每个 lane 占据自己的宽度
-    const barWidth = Math.min(width, laneWidth * 0.95)
-    const barLeft = left + lane * (barWidth + 4)
+    // 用百分比宽度，每个 lane 占 1/laneCount
+    const barWidthPercent = 100 / laneCount
+    const barLeftPercent = lane * barWidthPercent
 
     const log = todayLogs[a.id]
     const status = log
@@ -287,7 +266,6 @@ export function TimeGridView({
     const nowMin = now.getHours() * 60 + now.getMinutes()
     const isOverdue = !log && a.deadline && nowMin > timeToMin(a.deadline)!
 
-    // 状态色
     const statusClass =
       status === 'completed'
         ? 'bg-emerald-100 border-emerald-400 text-emerald-900'
@@ -298,18 +276,19 @@ export function TimeGridView({
         : 'bg-primary/15 border-primary text-primary-foreground'
 
     const isDragging = dragState?.activityId === a.id && dragState.moved
-    const dragDeltaLeft = isDragging ? (dragState!.deltaMin / 60) * HOUR_PX : 0
+    const dragDeltaTop = isDragging ? (dragState!.deltaMin / 60) * HOUR_PX : 0
 
     return (
       <div
         key={a.id}
-        className={`absolute top-1 rounded-lg border-2 px-2 py-1 cursor-pointer shadow-sm transition-shadow hover:shadow-md select-none ${
+        className={`absolute rounded-lg border-2 px-1.5 py-1 cursor-pointer shadow-sm transition-shadow hover:shadow-md select-none flex flex-col overflow-hidden pointer-events-auto ${
           statusClass
-        } ${isDragging ? 'ring-2 ring-primary ring-offset-1 z-10 opacity-90' : ''}`}
+        } ${isDragging ? 'ring-2 ring-primary ring-offset-1 z-20 opacity-90' : ''}`}
         style={{
-          left: barLeft + dragDeltaLeft,
-          width: barWidth,
-          height: BAR_HEIGHT - 4,
+          left: `calc(${barLeftPercent}% + 2px)`,
+          width: `calc(${barWidthPercent}% - 4px)`,
+          top: top + dragDeltaTop,
+          height,
         }}
         onPointerDown={(e) => handlePointerDown(e, a)}
         onPointerMove={handlePointerMove}
@@ -317,18 +296,12 @@ export function TimeGridView({
         onPointerCancel={handlePointerUp}
         title={`${a.title} ${a.scheduledTime}-${a.deadline || minToTime(s + 60)}`}
       >
-        <div className="flex items-center gap-1 h-full">
+        <div className="flex items-center gap-1 shrink-0">
           {isParent && (
             <GripVertical className="w-3 h-3 shrink-0 opacity-60" />
           )}
-          <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold truncate leading-tight">
-              {a.title}
-            </div>
-            <div className="text-[9px] opacity-80 truncate">
-              {a.scheduledTime}
-              {a.deadline && ` → ${a.deadline}`}
-            </div>
+          <div className="text-[11px] font-semibold truncate flex-1 leading-tight">
+            {a.title}
           </div>
           {saving === a.id && (
             <Loader2 className="w-3 h-3 animate-spin shrink-0" />
@@ -337,9 +310,13 @@ export function TimeGridView({
             <CheckCircle2 className="w-3 h-3 shrink-0" />
           )}
         </div>
+        <div className="text-[9px] opacity-80 truncate shrink-0 mt-0.5">
+          {a.scheduledTime}
+          {a.deadline && ` → ${a.deadline}`}
+        </div>
         {/* 拖拽时显示时间提示气泡 */}
         {isDragging && hoverTime?.id === a.id && (
-          <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] px-2 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none z-20">
+          <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-foreground text-background text-[10px] px-2 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none z-30">
             {hoverTime.start} - {hoverTime.end}
           </div>
         )}
@@ -358,7 +335,7 @@ export function TimeGridView({
           {isParent && (
             <span className="flex items-center gap-1">
               <GripVertical className="w-3 h-3" />
-              可拖动条目调整时间
+              可上下拖动调整时间
             </span>
           )}
         </div>
@@ -371,60 +348,64 @@ export function TimeGridView({
           <p className="text-sm text-muted-foreground">今日没有安排活动</p>
         </Card>
       ) : (
-        <Card className="p-3 overflow-hidden">
-          <div className="overflow-x-auto scroll-area" ref={containerRef}>
-            <div style={{ width: totalWidth, minWidth: '100%' }}>
-              {/* 时间刻度 */}
-              <div className="relative h-6 border-b border-border mb-1">
+        <Card className="p-2 overflow-hidden">
+          <div className="overflow-y-auto scroll-area" style={{ maxHeight: '65vh' }}>
+            <div className="relative flex" style={{ minHeight: totalHeight }}>
+              {/* 左侧时间刻度 */}
+              <div
+                className="relative shrink-0 border-r border-border bg-muted/30"
+                style={{ width: TIME_LABEL_WIDTH, minHeight: totalHeight }}
+              >
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="absolute top-0 text-[10px] text-muted-foreground tabular-nums"
-                    style={{ left: ((h * 60 - rangeStart) / 60) * HOUR_PX }}
+                    className="absolute left-0 right-0 text-[10px] text-muted-foreground tabular-nums"
+                    style={{ top: ((h * 60 - rangeStart) / 60) * HOUR_PX - 6 }}
                   >
-                    <div className="border-l border-border h-2" />
-                    <span className="ml-0.5">{String(h).padStart(2, '0')}:00</span>
+                    <div className="px-1 text-right pr-2 font-medium">
+                      {String(h).padStart(2, '0')}:00
+                    </div>
                   </div>
                 ))}
               </div>
 
-              {/* 活动组 */}
-              <div className="relative" style={{ height: groups.length * (BAR_HEIGHT + ROW_GAP) }}>
-                {/* 网格背景线 */}
+              {/* 右侧活动区 */}
+              <div
+                ref={containerRef}
+                className="relative flex-1"
+                style={{ minHeight: totalHeight }}
+              >
+                {/* 水平网格背景线（每小时一条） */}
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="absolute top-0 bottom-0 border-l border-border/40"
-                    style={{ left: ((h * 60 - rangeStart) / 60) * HOUR_PX }}
+                    className="absolute left-0 right-0 border-t border-border/40"
+                    style={{ top: ((h * 60 - rangeStart) / 60) * HOUR_PX }}
                   />
                 ))}
 
-                {/* 当前时间指示线 */}
+                {/* 当前时刻指示线（水平红线） */}
                 {(() => {
                   const now = new Date()
                   const nowMin = now.getHours() * 60 + now.getMinutes()
                   if (nowMin < rangeStart || nowMin > rangeEnd) return null
-                  const left = ((nowMin - rangeStart) / 60) * HOUR_PX
+                  const top = ((nowMin - rangeStart) / 60) * HOUR_PX
                   return (
                     <div
-                      className="absolute top-0 bottom-0 border-l-2 border-red-500 z-10 pointer-events-none"
-                      style={{ left }}
+                      className="absolute left-0 right-0 border-t-2 border-red-500 z-10 pointer-events-none"
+                      style={{ top }}
                     >
-                      <div className="absolute -top-1 -left-1 w-2 h-2 rounded-full bg-red-500" />
+                      <div className="absolute -left-1 -top-1.5 w-3 h-3 rounded-full bg-red-500" />
+                      <div className="absolute right-1 -top-4 text-[9px] text-red-600 font-medium bg-background/80 px-1 rounded">
+                        现在 {String(now.getHours()).padStart(2, '0')}:{String(now.getMinutes()).padStart(2, '0')}
+                      </div>
                     </div>
                   )
                 })()}
 
-                {/* 活动条 */}
+                {/* 活动条（按组分配 lane 宽度） */}
                 {groups.map((group, gi) => (
-                  <div
-                    key={gi}
-                    className="relative"
-                    style={{
-                      top: gi * (BAR_HEIGHT + ROW_GAP),
-                      height: BAR_HEIGHT,
-                    }}
-                  >
+                  <div key={gi} className="absolute inset-0 pointer-events-none">
                     {group.activities.map((a) => renderBar(a, group.laneCount))}
                   </div>
                 ))}
