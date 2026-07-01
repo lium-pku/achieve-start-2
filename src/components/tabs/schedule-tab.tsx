@@ -45,7 +45,7 @@ export function ScheduleTab({ currentMember, members }: Props) {
   const [todayLogs, setTodayLogs] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily')
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Activity | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -184,10 +184,24 @@ export function ScheduleTab({ currentMember, members }: Props) {
 
   return (
     <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">日程管理</h2>
+      {/* 顶部：标题 + 视图切换 + 操作按钮（同一行） */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-lg font-bold shrink-0">日程管理</h2>
+        <ToggleGroup
+          type="single"
+          value={viewMode}
+          onValueChange={(v) => v && setViewMode(v as ViewMode)}
+          className="bg-muted rounded-lg p-0.5 shrink-0"
+        >
+          <ToggleGroupItem value="grid" className="px-3 h-8 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <Grid3x3 className="w-3.5 h-3.5 mr-1" /> 网格
+          </ToggleGroupItem>
+          <ToggleGroupItem value="list" className="px-3 h-8 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
+            <List className="w-3.5 h-3.5 mr-1" /> 列表
+          </ToggleGroupItem>
+        </ToggleGroup>
         {isParent && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <Button size="sm" variant="outline" onClick={handleCheckPenalty} className="h-8">
               <AlertTriangle className="w-3.5 h-3.5 mr-1" /> 扣分检查
             </Button>
@@ -205,23 +219,6 @@ export function ScheduleTab({ currentMember, members }: Props) {
           </p>
         </Card>
       )}
-
-      {/* 视图切换 Toggle */}
-      <div className="flex items-center justify-center">
-        <ToggleGroup
-          type="single"
-          value={viewMode}
-          onValueChange={(v) => v && setViewMode(v as ViewMode)}
-          className="bg-muted rounded-lg p-0.5"
-        >
-          <ToggleGroupItem value="list" className="px-4 h-8 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-            <List className="w-3.5 h-3.5 mr-1" /> 列表视图
-          </ToggleGroupItem>
-          <ToggleGroupItem value="grid" className="px-4 h-8 text-xs data-[state=on]:bg-background data-[state=on]:shadow-sm rounded-md">
-            <Grid3x3 className="w-3.5 h-3.5 mr-1" /> 时间网格
-          </ToggleGroupItem>
-        </ToggleGroup>
-      </div>
 
       {/* 列表视图：保留日度/周度/月度 Tab */}
       {viewMode === 'list' && (
