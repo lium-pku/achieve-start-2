@@ -38,8 +38,15 @@ export async function POST(req: Request) {
             },
           },
         })
-        // 已完成 / 已扣过分 → 跳过
-        if (existing && (existing.status === 'completed' || existing.status === 'missed')) continue
+        // 已打卡（待审核/已通过/已拒绝）/ 已扣过分 → 跳过
+        if (
+          existing &&
+          (existing.status === 'completed' ||
+            existing.status === 'missed' ||
+            existing.status === 'pending_verification' ||
+            existing.status === 'rejected')
+        )
+          continue
 
         // 标记为 missed 并扣分
         const penalty = -activity.points // 扣除基础积分

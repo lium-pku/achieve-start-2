@@ -37,11 +37,14 @@ export interface ActivityLog {
   activityId: string
   memberId: string
   occurrenceDate: string
-  status: 'completed' | 'missed' | 'pending'
+  status: 'pending_verification' | 'completed' | 'rejected' | 'missed'
   onTime: boolean
   pointsAwarded: number
   bonusAwarded: number
   completedAt: string | null
+  operatorId: string | null
+  verifiedAt: string | null
+  verifiedById: string | null
 }
 
 export interface ActivityWithLog extends Activity {

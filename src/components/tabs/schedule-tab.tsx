@@ -68,33 +68,35 @@ export function ScheduleTab({ currentMember, members }: Props) {
   const loadGrid = useCallback(async () => {
     try {
       const isChild = currentMember.role === 'child'
-      // 孩子只看分配给自己的活动；家长看所有今日活动
       const url = isChild
         ? `/api/activities?today=1&assignedToId=${currentMember.id}`
         : `/api/activities?today=1`
       const todayActs = await api<Activity[]>(url)
       setAllActivities(todayActs)
 
-      // 收集需要查询日志的成员 ID（活动分配给的孩子）
+      // 收集需要查询日志的成员 ID
       const memberIds = new Set<string>()
       todayActs.forEach((a) => {
         if (a.assignedToId) memberIds.add(a.assignedToId)
       })
       if (isChild) memberIds.add(currentMember.id)
 
-      // 拉取所有相关成员的今日积分流水
+      // 拉取所有相关成员的今日 ActivityLog（用 logs API，含 status 字段）
       const today = new Date()
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
       const logMap: Record<string, any> = {}
       await Promise.all(
         Array.from(memberIds).map(async (mid) => {
           try {
-            const txs = await api<any[]>(`/api/points/${mid}`)
-            for (const tx of txs) {
-              if (tx.createdAt?.startsWith(todayStr) && tx.activityId) {
-                // 同一活动只保留一条（取最新）
-                if (!logMap[tx.activityId] || new Date(tx.createdAt) > new Date(logMap[tx.activityId].createdAt)) {
-                  logMap[tx.activityId] = tx
+            const logs = await api<any[]>(`/api/activities/logs?memberId=${mid}&days=3`)
+            for (const log of logs) {
+              if (log.occurrenceDate?.startsWith(todayStr)) {
+                if (
+                  !logMap[log.activityId] ||
+                  new Date(log.completedAt || log.createdAt) >
+                    new Date(logMap[log.activityId].completedAt || logMap[log.activityId].createdAt)
+                ) {
+                  logMap[log.activityId] = log
                 }
               }
             }

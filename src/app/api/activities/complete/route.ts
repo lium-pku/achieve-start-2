@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { ok, fail, getOccurrenceDate, isOnTime, addPoints } from '@/lib/time-utils'
+import { ok, fail, getOccurrenceDate, isOnTime } from '@/lib/time-utils'
 
-// 标记活动完成（孩子主动打卡）
-// body: { activityId, memberId }
+// 标记活动完成（孩子主动打卡 或 家长代打卡）
+// body: { activityId, memberId, operatorId? }
 export async function POST(req: Request) {
   const body = await req.json()
-  const { activityId, memberId } = body
+  const { activityId, memberId, operatorId } = body
   if (!activityId || !memberId) return fail('缺少 activityId / memberId')
 
   const activity = await db.activity.findUnique({ where: { id: activityId } })
@@ -16,9 +16,14 @@ export async function POST(req: Request) {
   if (!member) return fail('成员不存在')
   if (member.role !== 'child') return fail('只有孩子角色才能完成活动')
 
+  if (operatorId) {
+    const operator = await db.member.findUnique({ where: { id: operatorId } })
+    if (!operator) return fail('操作人不存在')
+    if (operator.role !== 'mom' && operator.role !== 'dad') return fail('只有家长才能代打卡')
+  }
+
   const occurrence = getOccurrenceDate(activity.scheduleType)
 
-  // 检查是否已经完成过
   const existing = await db.activityLog.findUnique({
     where: {
       activityId_memberId_occurrenceDate: {
@@ -28,15 +33,14 @@ export async function POST(req: Request) {
       },
     },
   })
-  if (existing && existing.status === 'completed') {
-    return fail('本周期已完成该活动', 409)
+  if (existing && (existing.status === 'pending_verification' || existing.status === 'completed')) {
+    return fail('本周期已打卡该活动', 409)
   }
 
   const onTime = isOnTime(activity)
   const pointsAwarded = activity.points
   const bonusAwarded = onTime ? activity.onTimeBonus : 0
 
-  // 写入或更新日志
   const log = await db.activityLog.upsert({
     where: {
       activityId_memberId_occurrenceDate: {
@@ -46,50 +50,26 @@ export async function POST(req: Request) {
       },
     },
     update: {
-      status: 'completed',
+      status: 'pending_verification',
       onTime,
       pointsAwarded,
       bonusAwarded,
       completedAt: new Date(),
+      operatorId: operatorId || null,
+      verifiedAt: null,
+      verifiedById: null,
     },
     create: {
       activityId,
       memberId,
       occurrenceDate: occurrence,
-      status: 'completed',
+      status: 'pending_verification',
       onTime,
       pointsAwarded,
       bonusAwarded,
       completedAt: new Date(),
+      operatorId: operatorId || null,
     },
-  })
-
-  // 发放基础积分
-  await addPoints({
-    memberId,
-    amount: pointsAwarded,
-    type: 'earn',
-    reason: `完成「${activity.title}」`,
-    activityId,
-  })
-  // 发放按时奖励
-  if (bonusAwarded > 0) {
-    await addPoints({
-      memberId,
-      amount: bonusAwarded,
-      type: 'bonus',
-      reason: `按时完成「${activity.title}」奖励`,
-      activityId,
-    })
-  }
-
-  // 重新查最新积分
-  const updatedMember = await db.member.findUnique({ where: { id: memberId } })
-
-  // 检查是否触发新的鼓励阈值
-  const encouragements = await db.encouragement.findMany({
-    where: { threshold: { lte: updatedMember!.totalPoints } },
-    orderBy: { threshold: 'desc' },
   })
 
   return ok({
@@ -97,7 +77,8 @@ export async function POST(req: Request) {
     pointsAwarded,
     bonusAwarded,
     onTime,
-    totalPoints: updatedMember!.totalPoints,
-    encouragements,
+    message: operatorId
+      ? '代打卡成功，等待其他家长审核'
+      : '打卡成功，等待家长审核',
   })
 }

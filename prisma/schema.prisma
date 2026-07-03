@@ -66,11 +66,18 @@ model ActivityLog {
   memberId       String   // 完成的孩子 id
   // 该次活动的"实例日期"（日度=当天，周度=那一周的日期，月度=那个月）
   occurrenceDate DateTime
-  status         String   // "completed" | "missed" | "pending"
+  // pending_verification: 已打卡待家长审核
+  // completed: 审核通过，积分已发放
+  // rejected: 审核拒绝，不发积分
+  // missed: 未完成（系统扣分）
+  status         String   // "pending_verification" | "completed" | "rejected" | "missed"
   onTime         Boolean  @default(false)
-  pointsAwarded  Int      @default(0)
-  bonusAwarded   Int      @default(0)
-  completedAt    DateTime?
+  pointsAwarded  Int      @default(0)  // 应得基础积分（审核通过后实际发放）
+  bonusAwarded   Int      @default(0)  // 应得按时奖励
+  completedAt    DateTime?              // 打卡时间
+  operatorId     String?                // 打卡操作人（null=孩子自己，否则=家长 id 代打卡）
+  verifiedAt     DateTime?              // 审核时间
+  verifiedById   String?                // 审核人（家长 id）
   createdAt      DateTime @default(now())
 
   activity       Activity @relation(fields: [activityId], references: [id])

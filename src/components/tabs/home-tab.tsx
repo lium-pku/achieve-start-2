@@ -6,8 +6,19 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { CheckCircle2, Clock, Zap, Target, AlertTriangle, Sparkles } from 'lucide-react'
+import {
+  CheckCircle2,
+  Clock,
+  Zap,
+  Target,
+  AlertTriangle,
+  Sparkles,
+  Clock3,
+  XCircle,
+  UserCheck,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { PendingVerificationPanel } from '@/components/shared/pending-verification-panel'
 
 interface Props {
   currentMember: Member
@@ -15,45 +26,56 @@ interface Props {
   onPointsChanged: () => void
 }
 
-export function HomeTab({ currentMember, onPointsChanged }: Props) {
+export function HomeTab({ currentMember, members, onPointsChanged }: Props) {
   const [activities, setActivities] = useState<ActivityWithLog[]>([])
   const [encouragements, setEncouragements] = useState<Encouragement[]>([])
   const [logs, setLogs] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState<string | null>(null)
-  const [floatPoints, setFloatPoints] = useState<{ id: string; amount: number } | null>(null)
 
   const isChild = currentMember.role === 'child'
+  const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
+
+  // 家长视角下默认显示第一个孩子的任务
+  const childMember = isChild
+    ? currentMember
+    : members.find((m) => m.role === 'child') || null
 
   const loadAll = useCallback(async () => {
     try {
-      const [todayActs, encs] = await Promise.all([
-        api<Activity[]>(`/api/activities?today=1&assignedToId=${currentMember.id}`),
+      if (!childMember) {
+        setActivities([])
+        const encs = await api<Encouragement[]>('/api/encouragements')
+        setEncouragements(encs)
+        setLoading(false)
+        return
+      }
+
+      const [todayActs, encs, todayLogs] = await Promise.all([
+        api<Activity[]>(`/api/activities?today=1&assignedToId=${childMember.id}`),
         api<Encouragement[]>('/api/encouragements'),
+        api<any[]>(`/api/activities/logs?memberId=${childMember.id}&days=3`),
       ])
       setActivities(todayActs as ActivityWithLog[])
       setEncouragements(encs)
 
-      // 拉取今日完成情况
-      if (todayActs.length > 0) {
-        const txs = await api<any[]>(`/api/points/${currentMember.id}`)
-        const today = new Date()
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-        const logMap: Record<string, any> = {}
-        for (const tx of txs) {
-          if (tx.createdAt?.startsWith(todayStr) && tx.activityId) {
-            logMap[tx.activityId] = tx
-          }
+      // 用 activity log 构建今日状态 map
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      const logMap: Record<string, any> = {}
+      for (const log of todayLogs) {
+        if (log.occurrenceDate?.startsWith(todayStr)) {
+          logMap[log.activityId] = log
         }
-        setLogs(logMap)
       }
+      setLogs(logMap)
     } catch (e) {
       console.error(e)
       toast.error('加载失败')
     } finally {
       setLoading(false)
     }
-  }, [currentMember.id])
+  }, [childMember])
 
   useEffect(() => {
     setLoading(true)
@@ -61,16 +83,18 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
   }, [loadAll])
 
   const handleComplete = async (activityId: string) => {
+    if (!childMember) return
     setCompleting(activityId)
     try {
-      const res = await api<{ pointsAwarded: number; bonusAwarded: number; onTime: boolean; totalPoints: number }>('/api/activities/complete', {
+      const body: any = { activityId, memberId: childMember.id }
+      if (isParent) {
+        body.operatorId = currentMember.id
+      }
+      const res = await api<{ message: string }>('/api/activities/complete', {
         method: 'POST',
-        body: JSON.stringify({ activityId, memberId: currentMember.id }),
+        body: JSON.stringify(body),
       })
-      const total = res.pointsAwarded + res.bonusAwarded
-      setFloatPoints({ id: activityId, amount: total })
-      setTimeout(() => setFloatPoints(null), 1000)
-      toast.success(`完成！+${total} 分${res.onTime ? '（含按时奖励）' : ''}`)
+      toast.success(res.message || '打卡成功')
       await loadAll()
       onPointsChanged()
     } catch (e: any) {
@@ -81,10 +105,11 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
   }
 
   const handleCheckPenalty = async () => {
+    if (!childMember) return
     try {
-      const res = await api<{ processed: number; results: any[] }>('/api/activities/check-penalty', {
+      const res = await api<{ processed: number }>('/api/activities/check-penalty', {
         method: 'POST',
-        body: JSON.stringify({ memberId: currentMember.id }),
+        body: JSON.stringify({ memberId: childMember.id }),
       })
       if (res.processed === 0) {
         toast.success('没有未完成的活动需要扣分')
@@ -100,27 +125,40 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
 
   // 统计
   const total = activities.length
-  const completed = activities.filter((a) => logs[a.id]).length
-  const pending = total - completed
-  const todayEarned = activities
-    .filter((a) => logs[a.id])
-    .reduce((s, a) => s + (logs[a.id]?.amount || 0), 0)
+  const checked = activities.filter((a) => logs[a.id]?.status === 'completed').length
+  const pendingVerify = activities.filter(
+    (a) => logs[a.id]?.status === 'pending_verification'
+  ).length
+  const rejected = activities.filter((a) => logs[a.id]?.status === 'rejected').length
+  const notChecked = total - checked - pendingVerify - rejected
+
+  const displayPoints = childMember?.totalPoints || 0
 
   // 当前等级
   const sortedEncs = [...encouragements].sort((a, b) => a.threshold - b.threshold)
   let currentLevel: Encouragement | null = null
   let nextLevel: Encouragement | null = null
   for (let i = 0; i < sortedEncs.length; i++) {
-    if (currentMember.totalPoints >= sortedEncs[i].threshold) {
+    if (displayPoints >= sortedEncs[i].threshold) {
       currentLevel = sortedEncs[i]
       nextLevel = sortedEncs[i + 1] || null
     } else if (!nextLevel) {
       nextLevel = sortedEncs[i]
     }
   }
-  const levelProgress = currentLevel && nextLevel
-    ? Math.min(100, ((currentMember.totalPoints - currentLevel.threshold) / (nextLevel.threshold - currentLevel.threshold)) * 100)
-    : currentLevel ? 100 : nextLevel ? Math.min(100, (currentMember.totalPoints / nextLevel.threshold) * 100) : 0
+  const levelProgress =
+    currentLevel && nextLevel
+      ? Math.min(
+          100,
+          ((displayPoints - currentLevel.threshold) /
+            (nextLevel.threshold - currentLevel.threshold)) *
+            100
+        )
+      : currentLevel
+      ? 100
+      : nextLevel
+      ? Math.min(100, (displayPoints / nextLevel.threshold) * 100)
+      : 0
 
   const now = new Date()
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
@@ -134,12 +172,14 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
           <div>
             <p className="text-sm opacity-90">{dateStr} · {weekday}</p>
             <h2 className="text-xl font-bold mt-0.5">
-              {currentMember.avatar} {currentMember.name}，加油！
+              {isParent && childMember
+                ? `${childMember.avatar} ${childMember.name} 的任务`
+                : `${currentMember.avatar} ${currentMember.name}，加油！`}
             </h2>
           </div>
           <div className="text-right">
-            <div className="text-3xl font-black tabular-nums">{currentMember.totalPoints}</div>
-            <div className="text-xs opacity-90">累计积分</div>
+            <div className="text-3xl font-black tabular-nums">{displayPoints}</div>
+            <div className="text-xs opacity-90">已审核积分</div>
           </div>
         </div>
         {currentLevel && (
@@ -155,7 +195,7 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
               <>
                 <Progress value={levelProgress} className="h-1.5 bg-white/20 mt-2" />
                 <p className="text-[10px] opacity-80 mt-1">
-                  距离「{nextLevel.icon} {nextLevel.title}」还差 {nextLevel.threshold - currentMember.totalPoints} 分
+                  距离「{nextLevel.icon} {nextLevel.title}」还差 {nextLevel.threshold - displayPoints} 分
                 </p>
               </>
             )}
@@ -163,22 +203,36 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
         )}
       </Card>
 
+      {/* 待审核面板（仅家长可见） */}
+      <PendingVerificationPanel
+        currentMember={currentMember}
+        onVerified={() => {
+          loadAll()
+          onPointsChanged()
+        }}
+      />
+
       {/* 今日数据小卡片 */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="p-3 text-center">
+      <div className="grid grid-cols-4 gap-2">
+        <Card className="p-2 text-center">
           <Target className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
-          <div className="text-lg font-bold tabular-nums">{total}</div>
-          <div className="text-[10px] text-muted-foreground">今日任务</div>
+          <div className="text-base font-bold tabular-nums">{total}</div>
+          <div className="text-[10px] text-muted-foreground">总任务</div>
         </Card>
-        <Card className="p-3 text-center bg-accent/30">
+        <Card className="p-2 text-center bg-accent/30">
           <CheckCircle2 className="w-4 h-4 mx-auto mb-1 text-accent-foreground" />
-          <div className="text-lg font-bold tabular-nums">{completed}</div>
-          <div className="text-[10px] text-muted-foreground">已完成</div>
+          <div className="text-base font-bold tabular-nums">{checked}</div>
+          <div className="text-[10px] text-muted-foreground">已审核</div>
         </Card>
-        <Card className="p-3 text-center">
+        <Card className="p-2 text-center bg-amber-50">
+          <Clock3 className="w-4 h-4 mx-auto mb-1 text-amber-500" />
+          <div className="text-base font-bold tabular-nums">{pendingVerify}</div>
+          <div className="text-[10px] text-muted-foreground">待审核</div>
+        </Card>
+        <Card className="p-2 text-center">
           <Zap className="w-4 h-4 mx-auto mb-1 text-primary" />
-          <div className="text-lg font-bold tabular-nums">+{todayEarned}</div>
-          <div className="text-[10px] text-muted-foreground">今日获得</div>
+          <div className="text-base font-bold tabular-nums">{notChecked}</div>
+          <div className="text-[10px] text-muted-foreground">待打卡</div>
         </Card>
       </div>
 
@@ -187,10 +241,15 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-base font-semibold flex items-center gap-1.5">
             <Clock className="w-4 h-4" /> 今日待办
+            {isParent && childMember && (
+              <Badge variant="outline" className="text-[10px] ml-1">
+                <UserCheck className="w-2.5 h-2.5 mr-0.5" /> 可代打卡
+              </Badge>
+            )}
           </h3>
-          {!isChild && pending > 0 && (
+          {isParent && notChecked > 0 && (
             <Button size="sm" variant="outline" onClick={handleCheckPenalty} className="h-7 text-xs">
-              <AlertTriangle className="w-3 h-3 mr-1" /> 检查扣分
+              <AlertTriangle className="w-3 h-3 mr-1" /> 扣分检查
             </Button>
           )}
         </div>
@@ -206,12 +265,22 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
           <div className="space-y-2">
             {activities.map((a) => {
               const log = logs[a.id]
-              const isDone = !!log
+              const status = log?.status
+              const isCompleted = status === 'completed'
+              const isPendingVerify = status === 'pending_verification'
+              const isRejected = status === 'rejected'
+
               return (
                 <Card
                   key={a.id}
                   className={`p-3 flex items-center gap-3 card-pressable ${
-                    isDone ? 'bg-accent/20 border-accent' : 'bg-card'
+                    isCompleted
+                      ? 'bg-emerald-50 border-emerald-300'
+                      : isPendingVerify
+                      ? 'bg-amber-50 border-amber-300'
+                      : isRejected
+                      ? 'bg-red-50 border-red-300'
+                      : 'bg-card'
                   }`}
                 >
                   <div className="flex-1 min-w-0">
@@ -234,38 +303,36 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
                       <span className="text-muted-foreground/70">· {SCHEDULE_LABEL[a.scheduleType]}</span>
                     </div>
                   </div>
-                  {isChild ? (
-                    <div className="relative">
-                      <Button
-                        size="sm"
-                        disabled={isDone || completing === a.id}
-                        onClick={() => handleComplete(a.id)}
-                        className={`h-9 ${isDone ? 'bg-accent text-accent-foreground hover:bg-accent' : ''}`}
-                      >
-                        {isDone ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 mr-1" /> 已完成
-                          </>
-                        ) : completing === a.id ? (
-                          '提交中...'
-                        ) : (
-                          '打卡'
-                        )}
-                      </Button>
-                      {floatPoints?.id === a.id && (
-                        <div className="absolute -top-2 right-0 text-primary font-bold text-sm animate-float-up pointer-events-none">
-                          +{floatPoints.amount}
-                        </div>
-                      )}
-                    </div>
+
+                  {isCompleted ? (
+                    <Badge className="bg-emerald-100 text-emerald-700">
+                      <CheckCircle2 className="w-3 h-3 mr-0.5" /> 已审核
+                    </Badge>
+                  ) : isPendingVerify ? (
+                    <Badge className="bg-amber-100 text-amber-700">
+                      <Clock3 className="w-3 h-3 mr-0.5" /> 待审核
+                    </Badge>
+                  ) : isRejected ? (
+                    <Badge className="bg-red-100 text-red-700">
+                      <XCircle className="w-3 h-3 mr-0.5" /> 已拒绝
+                    </Badge>
                   ) : (
-                    <div>
-                      {isDone ? (
-                        <Badge className="bg-accent text-accent-foreground">已完成</Badge>
+                    <Button
+                      size="sm"
+                      disabled={completing === a.id}
+                      onClick={() => handleComplete(a.id)}
+                      className="h-9"
+                    >
+                      {completing === a.id ? (
+                        '提交中...'
+                      ) : isParent ? (
+                        <>
+                          <UserCheck className="w-4 h-4 mr-1" /> 代打卡
+                        </>
                       ) : (
-                        <Badge variant="outline" className="text-muted-foreground">待完成</Badge>
+                        '打卡'
                       )}
-                    </div>
+                    </Button>
                   )}
                 </Card>
               )
@@ -283,7 +350,7 @@ export function HomeTab({ currentMember, onPointsChanged }: Props) {
           <Card className="p-3">
             <div className="space-y-2">
               {sortedEncs.map((e) => {
-                const reached = currentMember.totalPoints >= e.threshold
+                const reached = displayPoints >= e.threshold
                 return (
                   <div key={e.id} className={`flex items-center gap-3 p-2 rounded-lg ${reached ? 'bg-accent/30' : ''}`}>
                     <span className={`text-2xl ${reached ? '' : 'grayscale opacity-50'}`}>{e.icon}</span>
