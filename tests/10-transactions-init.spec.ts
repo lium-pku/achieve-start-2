@@ -3,13 +3,13 @@ import {
   findMemberByRole,
   getPointTransactions,
   setMemberPoints,
-  resetAll,
+  resetAndSeed,
   initSeed,
   getMembers,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 10：积分流水查询 + init 幂等', () => {

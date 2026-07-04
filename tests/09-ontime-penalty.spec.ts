@@ -6,12 +6,12 @@ import {
   verify,
   setMemberPoints,
   getMembers,
-  resetAll,
+  resetAndSeed,
   createActivity,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 9：按时奖励逻辑 + 积分扣到 0 保护', () => {

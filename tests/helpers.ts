@@ -128,9 +128,17 @@ export async function updateActivityTime(
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// 测试专用：重置所有数据（清空打卡记录/积分流水/兑换记录，重置积分）
+// 测试专用：彻底重置所有数据（清空全部 9 张表）
 export async function resetAll(): Promise<void> {
   await api('/api/test/reset', { method: 'POST' })
+}
+
+// 测试专用：重置并写入固定初始数据
+// 每次测试前调用，确保从完全相同的状态开始
+// 固定数据：3 成员(积分0) + 5 活动 + 3 鼓励 + 2 奖励，无打卡/流水/目标/点评
+export async function resetAndSeed(): Promise<void> {
+  await resetAll()
+  await api('/api/test/seed', { method: 'POST' })
 }
 
 // === 成员 CRUD ===

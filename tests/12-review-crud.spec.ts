@@ -4,11 +4,11 @@ import {
   getReviews,
   createReview,
   deleteReview,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 12：复盘点评 CRUD', () => {

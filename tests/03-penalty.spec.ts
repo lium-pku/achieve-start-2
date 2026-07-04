@@ -8,11 +8,11 @@ import {
   setMemberPoints,
   getMembers,
   getPending,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 3：扣分流程', () => {

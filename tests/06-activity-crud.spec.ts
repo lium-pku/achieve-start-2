@@ -5,12 +5,12 @@ import {
   updateActivity,
   deleteActivity,
   getTodayActivities,
-  resetAll,
+  resetAndSeed,
   api,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 6：活动 CRUD', () => {

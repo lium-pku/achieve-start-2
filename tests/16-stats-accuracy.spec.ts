@@ -6,12 +6,12 @@ import {
   verify,
   getTodayActivities,
   getPending,
-  resetAll,
+  resetAndSeed,
   setMemberPoints,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 16：统计计算准确性', () => {

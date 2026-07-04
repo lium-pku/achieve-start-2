@@ -7,11 +7,11 @@ import {
   resolveRedemption,
   setMemberPoints,
   getMembers,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 4：兑换流程', () => {

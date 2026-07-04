@@ -4,12 +4,12 @@ import {
   getReviews,
   createReview,
   deleteReview,
-  resetAll,
+  resetAndSeed,
   api,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 15：点评边界与编辑', () => {

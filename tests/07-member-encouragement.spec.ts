@@ -7,11 +7,11 @@ import {
   getMembers,
   getEncouragements,
   createEncouragement,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 7：成员 CRUD + 鼓励阈值', () => {
@@ -48,9 +48,9 @@ test.describe('流程 7：成员 CRUD + 鼓励阈值', () => {
   })
 
   test('鼓励阈值列表 + 新增', async () => {
-    // 1. 获取鼓励阈值列表（init 应已创建 5 个）
+    // 1. 获取鼓励阈值列表（固定 seed 应有 3 个）
     const encs = await getEncouragements()
-    expect(encs.length).toBeGreaterThanOrEqual(5)
+    expect(encs.length).toBeGreaterThanOrEqual(3)
 
     // 2. 新增一个鼓励阈值
     const created = await createEncouragement({

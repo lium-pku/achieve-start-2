@@ -7,12 +7,12 @@ import {
   verify,
   getActivityLogs,
   setMemberPoints,
-  resetAll,
+  resetAndSeed,
   getMembers,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 1：打卡 → 审核 → 发分', () => {

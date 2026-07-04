@@ -10,11 +10,11 @@ import {
   getRedemptions,
   resolveRedemption,
   setMemberPoints,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 8：批量审核多个 + 兑换 fulfilled', () => {

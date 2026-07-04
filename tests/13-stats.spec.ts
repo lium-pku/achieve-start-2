@@ -4,11 +4,11 @@ import {
   getStats,
   checkIn,
   verify,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 13：统计数据准确性', () => {

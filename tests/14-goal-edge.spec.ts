@@ -5,11 +5,11 @@ import {
   createGoal,
   updateGoal,
   deleteGoal,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 14：目标边界与字段校验', () => {

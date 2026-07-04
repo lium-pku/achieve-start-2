@@ -8,11 +8,11 @@ import {
   getActivityLogs,
   setMemberPoints,
   getMembers,
-  resetAll,
+  resetAndSeed,
 } from './helpers'
 
 test.beforeAll(async () => {
-  await resetAll()
+  await resetAndSeed()
 })
 
 test.describe('流程 2：拒绝审核 → 重新打卡', () => {
