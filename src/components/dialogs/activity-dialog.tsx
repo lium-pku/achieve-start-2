@@ -50,6 +50,7 @@ export function ActivityDialog({
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily')
   const [dayOfWeek, setDayOfWeek] = useState<number>(1)
   const [dayOfMonth, setDayOfMonth] = useState<number>(1)
+  const [specificDate, setSpecificDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('')
   const [deadline, setDeadline] = useState('')
   const [points, setPoints] = useState('2')
@@ -65,6 +66,7 @@ export function ActivityDialog({
         setScheduleType(activity.scheduleType)
         setDayOfWeek(activity.dayOfWeek || 1)
         setDayOfMonth(activity.dayOfMonth || 1)
+        setSpecificDate(activity.specificDate ? new Date(activity.specificDate).toISOString().split('T')[0] : '')
         setScheduledTime(activity.scheduledTime || '')
         setDeadline(activity.deadline || '')
         setPoints(String(activity.points))
@@ -76,6 +78,7 @@ export function ActivityDialog({
         setScheduleType(defaultScheduleType)
         setDayOfWeek(1)
         setDayOfMonth(1)
+        setSpecificDate(new Date().toISOString().split('T')[0])
         setScheduledTime('')
         setDeadline('')
         setPoints('2')
@@ -103,6 +106,7 @@ export function ActivityDialog({
         scheduleType,
         dayOfWeek: scheduleType === 'weekly' ? dayOfWeek : null,
         dayOfMonth: scheduleType === 'monthly' ? dayOfMonth : null,
+        specificDate: scheduleType === 'once' ? specificDate : null,
         scheduledTime: scheduledTime || null,
         deadline: deadline || null,
         points: Number(points) || 1,
@@ -174,6 +178,7 @@ export function ActivityDialog({
                 <SelectItem value="daily">{SCHEDULE_LABEL.daily}</SelectItem>
                 <SelectItem value="weekly">{SCHEDULE_LABEL.weekly}</SelectItem>
                 <SelectItem value="monthly">{SCHEDULE_LABEL.monthly}</SelectItem>
+                <SelectItem value="once">{SCHEDULE_LABEL.once}（一次性）</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -214,6 +219,17 @@ export function ActivityDialog({
             </div>
           )}
 
+          {scheduleType === 'once' && (
+            <div className="space-y-1.5">
+              <Label>具体日期 *</Label>
+              <Input
+                type="date"
+                value={specificDate}
+                onChange={(e) => setSpecificDate(e.target.value)}
+              />
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>计划时间</Label>
@@ -224,12 +240,13 @@ export function ActivityDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>截止时间</Label>
+              <Label>截止时间 {!deadline && <span className="text-[10px] text-amber-600">（建议设置）</span>}</Label>
               <Input
                 type="time"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
               />
+              <p className="text-[10px] text-muted-foreground">超过此时间算超时，无按时奖励</p>
             </div>
           </div>
 

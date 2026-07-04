@@ -105,6 +105,17 @@ export async function POST(req: Request) {
       createdById: dad.id,
       assignedToId: child.id,
     },
+    {
+      title: '临时活动-看牙医',
+      scheduleType: 'once',
+      specificDate: new Date(), // 今天
+      scheduledTime: '14:00',
+      deadline: '18:00',
+      points: 3,
+      onTimeBonus: 1,
+      createdById: mom.id,
+      assignedToId: child.id,
+    },
   ]
   for (const a of activities) {
     await db.activity.create({ data: { familyId, ...a } })

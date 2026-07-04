@@ -2,7 +2,7 @@
 import { useAppStore } from '@/lib/store'
 
 export type Role = 'child' | 'mom' | 'dad'
-export type ScheduleType = 'daily' | 'weekly' | 'monthly'
+export type ScheduleType = 'daily' | 'weekly' | 'monthly' | 'once'
 
 export interface Member {
   id: string
@@ -146,6 +146,7 @@ export const SCHEDULE_LABEL: Record<ScheduleType, string> = {
   daily: '日度',
   weekly: '周度',
   monthly: '月度',
+  once: '临时',
 }
 
 export const WEEKDAY_LABEL = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日']

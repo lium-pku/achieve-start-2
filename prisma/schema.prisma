@@ -78,13 +78,14 @@ model Activity {
   familyId      String
   title         String
   description   String?
-  scheduleType  String   // "daily" | "weekly" | "monthly"
-  dayOfWeek     Int?
-  dayOfMonth    Int?
+  scheduleType  String   // "daily" | "weekly" | "monthly" | "once"
+  dayOfWeek     Int?     // 周度：1-7
+  dayOfMonth    Int?     // 月度：1-31
+  specificDate  DateTime? // 临时：具体日期（once 类型用）
   scheduledTime String?
   points        Int      @default(1)
   onTimeBonus   Int      @default(0)
-  deadline      String?
+  deadline      String?  // 截止时间 HH:mm
   startDate     DateTime @default(now())
   active        Boolean  @default(true)
   createdById   String

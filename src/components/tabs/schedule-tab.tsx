@@ -40,8 +40,8 @@ interface Props {
 type ViewMode = 'list' | 'grid'
 
 export function ScheduleTab({ currentMember, members }: Props) {
-  const [allActivities, setAllActivities] = useState<Activity[]>([]) // 当日所有活动（网格视图用）
-  const [listActivities, setListActivities] = useState<Activity[]>([]) // 当前 scheduleType 的活动（列表视图用）
+  const [allActivities, setAllActivities] = useState<Activity[]>([])
+  const [listActivities, setListActivities] = useState<Activity[]>([])
   const [todayLogs, setTodayLogs] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily')
@@ -51,8 +51,11 @@ export function ScheduleTab({ currentMember, members }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  // 家长视角下选择的成员（看谁的活动）
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('')
 
   const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
+  const children = members.filter((m) => m.role === 'child')
 
   // 加载列表视图数据
   const loadList = useCallback(async () => {
@@ -64,52 +67,48 @@ export function ScheduleTab({ currentMember, members }: Props) {
     }
   }, [scheduleType])
 
-  // 加载网格视图数据（所有今日活动 + 完成日志）
+  // 加载网格视图数据（选中成员的今日活动 + 完成日志）
   const loadGrid = useCallback(async () => {
     try {
       const isChild = currentMember.role === 'child'
-      const url = isChild
-        ? `/api/activities?today=1&assignedToId=${currentMember.id}`
-        : `/api/activities?today=1`
+      const childList = members.filter((m) => m.role === 'child')
+      const targetMemberId = isChild
+        ? currentMember.id
+        : selectedMemberId || childList[0]?.id || ''
+      if (!targetMemberId) {
+        setAllActivities([])
+        setTodayLogs({})
+        return
+      }
+      const url = `/api/activities?today=1&assignedToId=${targetMemberId}`
       const todayActs = await api<Activity[]>(url)
       setAllActivities(todayActs)
 
-      // 收集需要查询日志的成员 ID
-      const memberIds = new Set<string>()
-      todayActs.forEach((a) => {
-        if (a.assignedToId) memberIds.add(a.assignedToId)
-      })
-      if (isChild) memberIds.add(currentMember.id)
-
-      // 拉取所有相关成员的今日 ActivityLog（用 logs API，含 status 字段）
       const today = new Date()
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
       const logMap: Record<string, any> = {}
-      await Promise.all(
-        Array.from(memberIds).map(async (mid) => {
-          try {
-            const logs = await api<any[]>(`/api/activities/logs?memberId=${mid}&days=3`)
-            for (const log of logs) {
-              if (log.occurrenceDate?.startsWith(todayStr)) {
-                if (
-                  !logMap[log.activityId] ||
-                  new Date(log.completedAt || log.createdAt) >
-                    new Date(logMap[log.activityId].completedAt || logMap[log.activityId].createdAt)
-                ) {
-                  logMap[log.activityId] = log
-                }
-              }
-            }
-          } catch (e) {
-            // 忽略单个成员查询失败
+      try {
+        const logs = await api<any[]>(`/api/activities/logs?memberId=${targetMemberId}&days=3`)
+        for (const log of logs) {
+          if (log.occurrenceDate?.startsWith(todayStr)) {
+            logMap[log.activityId] = log
           }
-        })
-      )
+        }
+      } catch (e) {
+        // 忽略
+      }
       setTodayLogs(logMap)
     } catch (e) {
       console.error(e)
     }
-  }, [currentMember.id, currentMember.role])
+  }, [currentMember.id, currentMember.role, selectedMemberId, members])
+
+  // 初始化 selectedMemberId（家长视角默认第一个孩子）
+  useEffect(() => {
+    if (isParent && !selectedMemberId && children.length > 0) {
+      setSelectedMemberId(children[0].id)
+    }
+  }, [isParent, selectedMemberId, children])
 
   useEffect(() => {
     let cancelled = false
@@ -331,6 +330,9 @@ export function ScheduleTab({ currentMember, members }: Props) {
               activities={allActivities}
               todayLogs={todayLogs}
               currentMember={currentMember}
+              members={children}
+              selectedMemberId={selectedMemberId}
+              onSelectedMemberChange={setSelectedMemberId}
               onReload={handleReload}
               onActivityClick={handleActivityClick}
               onActivityEdit={handleEdit}

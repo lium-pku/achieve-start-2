@@ -27,6 +27,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(body.onTimeBonus !== undefined && { onTimeBonus: Number(body.onTimeBonus) }),
       ...(body.dayOfWeek !== undefined && { dayOfWeek: body.dayOfWeek }),
       ...(body.dayOfMonth !== undefined && { dayOfMonth: body.dayOfMonth }),
+      ...(body.specificDate !== undefined && {
+        specificDate: body.specificDate ? new Date(body.specificDate) : null,
+      }),
       ...(body.active !== undefined && { active: body.active }),
       ...(body.assignedToId !== undefined && { assignedToId: body.assignedToId }),
     },

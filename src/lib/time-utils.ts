@@ -52,34 +52,56 @@ export function getOccurrenceDate(scheduleType: string, date: Date = new Date())
 }
 
 // 判断给定活动在今天是否应该出现
-export function isActiveToday(activity: {
+// 判断给定活动在指定日期是否应该出现
+// 支持 daily / weekly / monthly / once 四种类型
+export function isActiveOnDate(activity: {
   scheduleType: string
   dayOfWeek: number | null
   dayOfMonth: number | null
+  specificDate: Date | null
   startDate: Date
   active: boolean
 }, date: Date = new Date()): boolean {
   if (!activity.active) return false
-  if (activity.startDate > date) return false
 
-  const today = new Date(date)
-  today.setHours(0, 0, 0, 0)
+  const target = new Date(date)
+  target.setHours(0, 0, 0, 0)
+  const startDay = new Date(activity.startDate)
+  startDay.setHours(0, 0, 0, 0)
+  if (startDay > target) return false
 
   if (activity.scheduleType === 'daily') return true
 
   if (activity.scheduleType === 'weekly') {
-    // 周日 0，周一 1
-    const day = today.getDay()
-    // 把周日 0 转成 7 以便和 1-7 对齐
-    const todayDow = day === 0 ? 7 : day
-    return activity.dayOfWeek === todayDow
+    const day = target.getDay()
+    const targetDow = day === 0 ? 7 : day
+    return activity.dayOfWeek === targetDow
   }
 
   if (activity.scheduleType === 'monthly') {
-    return activity.dayOfMonth === today.getDate()
+    return activity.dayOfMonth === target.getDate()
+  }
+
+  if (activity.scheduleType === 'once') {
+    if (!activity.specificDate) return false
+    const spec = new Date(activity.specificDate)
+    spec.setHours(0, 0, 0, 0)
+    return spec.getTime() === target.getTime()
   }
 
   return false
+}
+
+// 兼容旧名（默认查今天）
+export function isActiveToday(activity: {
+  scheduleType: string
+  dayOfWeek: number | null
+  dayOfMonth: number | null
+  specificDate: Date | null
+  startDate: Date
+  active: boolean
+}, date: Date = new Date()): boolean {
+  return isActiveOnDate(activity, date)
 }
 
 // 判断活动当前是否还在按时窗口内
