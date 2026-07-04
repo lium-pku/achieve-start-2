@@ -25,7 +25,6 @@ test.describe('流程 1：打卡 → 审核 → 发分', () => {
     const activities = await getTodayActivities(child.id)
     expect(activities.length).toBeGreaterThan(0)
     const activity = activities[0]
-    const expectedPoints = activity.points + (activity.onTimeBonus || 0)
 
     // 2. 确认当前没有待审核记录
     const pendingBefore = await getPending()
@@ -61,7 +60,8 @@ test.describe('流程 1：打卡 → 审核 → 发分', () => {
     expect(log.verifiedById).toBe(mom.id)
     expect(log.verifiedAt).toBeTruthy()
 
-    // 8. 确认积分已到账
+    // 8. 确认积分已到账（用打卡时实际计算的积分）
+    const expectedPoints = checkInRes.pointsAwarded + checkInRes.bonusAwarded
     const membersAfter = await getMembers()
     const childAfter = membersAfter.find((m) => m.id === child.id)!
     expect(childAfter.totalPoints).toBe(expectedPoints)

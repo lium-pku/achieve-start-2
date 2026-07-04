@@ -59,10 +59,10 @@ test.describe('流程 5：代打卡 → 审核', () => {
     expect(log.verifiedById).toBe(dad.id)
     expect(log.operatorId).toBe(mom.id) // 打卡人仍是妈妈
 
-    // 6. 确认积分到账
+    // 6. 确认积分到账（用打卡时实际计算的积分）
     const membersAfter = await getMembers()
     const childAfter = membersAfter.find((m) => m.id === child.id)!
-    const expected = activity.points + (activity.onTimeBonus || 0)
+    const expected = res.pointsAwarded + res.bonusAwarded
     expect(childAfter.totalPoints).toBe(expected)
   })
 

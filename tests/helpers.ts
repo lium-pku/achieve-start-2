@@ -132,3 +132,92 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 export async function resetAll(): Promise<void> {
   await api('/api/test/reset', { method: 'POST' })
 }
+
+// === 成员 CRUD ===
+export async function createMember(data: {
+  name: string
+  role: Member['role']
+  avatar?: string
+  color?: string
+}): Promise<Member> {
+  return api<Member>('/api/members', { method: 'POST', body: data })
+}
+
+export async function deleteMember(memberId: string): Promise<void> {
+  await api(`/api/members/${memberId}`, { method: 'DELETE' })
+}
+
+export async function updateMember(
+  memberId: string,
+  data: { name?: string; avatar?: string; color?: string; totalPoints?: number }
+): Promise<Member> {
+  return api(`/api/members/${memberId}`, { method: 'PATCH', body: data })
+}
+
+// === 活动 CRUD ===
+export async function createActivity(activity: {
+  title: string
+  scheduleType: 'daily' | 'weekly' | 'monthly'
+  createdById: string
+  assignedToId?: string
+  scheduledTime?: string
+  deadline?: string
+  points?: number
+  onTimeBonus?: number
+  dayOfWeek?: number
+  dayOfMonth?: number
+  description?: string
+}): Promise<any> {
+  return api('/api/activities', { method: 'POST', body: activity })
+}
+
+export async function updateActivity(activityId: string, data: any): Promise<any> {
+  return api(`/api/activities/${activityId}`, { method: 'PATCH', body: data })
+}
+
+export async function deleteActivity(activityId: string): Promise<void> {
+  await api(`/api/activities/${activityId}`, { method: 'DELETE' })
+}
+
+// === 鼓励阈值 ===
+export async function getEncouragements(): Promise<any[]> {
+  return api('/api/encouragements')
+}
+
+export async function createEncouragement(data: {
+  threshold: number
+  title: string
+  message: string
+  icon?: string
+}): Promise<any> {
+  return api('/api/encouragements', { method: 'POST', body: data })
+}
+
+// === 奖励 CRUD ===
+export async function createReward(data: {
+  title: string
+  pointsCost: number
+  createdById: string
+  icon?: string
+  description?: string
+}): Promise<any> {
+  return api('/api/rewards', { method: 'POST', body: data })
+}
+
+export async function updateReward(rewardId: string, data: any): Promise<any> {
+  return api(`/api/rewards/${rewardId}`, { method: 'PATCH', body: data })
+}
+
+export async function deleteReward(rewardId: string): Promise<void> {
+  await api(`/api/rewards/${rewardId}`, { method: 'DELETE' })
+}
+
+// === 积分流水 ===
+export async function getPointTransactions(memberId: string): Promise<any[]> {
+  return api(`/api/points/${memberId}`)
+}
+
+// === 初始化 ===
+export async function initSeed(): Promise<any> {
+  return api('/api/init', { method: 'POST' })
+}
