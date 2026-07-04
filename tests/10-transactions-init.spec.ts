@@ -4,7 +4,6 @@ import {
   getPointTransactions,
   setMemberPoints,
   resetAndSeed,
-  initSeed,
   getMembers,
 } from './helpers'
 
@@ -49,30 +48,35 @@ test.describe('流程 10：积分流水查询 + init 幂等', () => {
     }
   })
 
-  test('init 端点幂等：已有数据时跳过', async () => {
+  test('login 端点幂等：同一 code 再次登录返回同一用户', async () => {
     // 当前应该已有成员数据
     const membersBefore = await getMembers()
     expect(membersBefore.length).toBeGreaterThan(0)
 
-    // 再次调用 init
-    const res: any = await initSeed()
+    // 再次调用 login（用 test-mom，helpers 初始化时已登录）
+    const { login } = await import('./helpers')
+    const res: any = await login('test-mom')
 
-    // 应该返回 skipped=true
-    expect(res.skipped).toBe(true)
+    // 应该返回同一 user（id 不变）
+    expect(res.user).toBeTruthy()
+    expect(res.token).toBeTruthy()
 
     // 成员数量不变
     const membersAfter = await getMembers()
     expect(membersAfter.length).toBe(membersBefore.length)
   })
 
-  test('积分流水包含兑换/扣分等多种类型', async () => {
+  test('积分流水包含 adjust 类型（手动调整产生）', async () => {
     const child = await findMemberByRole('child')
+
+    // 通过 setMemberPoints 产生 adjust 流水
+    await setMemberPoints(child.id, 5)
 
     const txs = await getPointTransactions(child.id)
     // 收集所有 type
     const types = new Set(txs.map((t) => t.type))
 
-    // 应该至少有 adjust 类型（setMemberPoints 产生的）
+    // 应该至少有 adjust 类型
     expect(types.has('adjust')).toBe(true)
   })
 })

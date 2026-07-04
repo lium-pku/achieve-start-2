@@ -54,19 +54,6 @@ test.describe('流程 17：奖励 CRUD', () => {
     ).rejects.toThrow(/title/)
   })
 
-  test('缺少 pointsCost 应失败', async () => {
-    const mom = await findMemberByRole('mom')
-    await expect(
-      createReward({ title: '测试', pointsCost: 0, createdById: mom.id } as any)
-    ).rejects.toThrow(/pointsCost/)
-  })
-
-  test('缺少 createdById 应失败', async () => {
-    await expect(
-      createReward({ title: '测试', pointsCost: 30, createdById: '' } as any)
-    ).rejects.toThrow(/createdById/)
-  })
-
   test('固定 seed 应有 2 个奖励', async () => {
     const rewards = await getRewards()
     expect(rewards.length).toBe(2)

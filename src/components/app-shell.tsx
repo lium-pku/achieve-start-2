@@ -9,6 +9,7 @@ import { RewardsTab } from '@/components/tabs/rewards-tab'
 import { FamilyTab } from '@/components/tabs/family-tab'
 import { PlanningTab } from '@/components/tabs/planning-tab'
 import { MemberSwitcher } from '@/components/shared/member-switcher'
+import { LoginDialog } from '@/components/login-dialog'
 import { Home, CalendarDays, Gift, Users, Target } from 'lucide-react'
 
 type Tab = 'home' | 'schedule' | 'rewards' | 'planning' | 'family'
@@ -17,38 +18,44 @@ export function AppShell() {
   const [tab, setTab] = useState<Tab>('home')
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
-  const { currentMemberId, initialized, setCurrentMember, setInitialized } = useAppStore()
+  const { currentMemberId, token, setCurrentMember, logout } = useAppStore()
 
-  // 初始化 + 加载成员
-  useEffect(() => {
-    ;(async () => {
-      try {
-        // 触发种子数据
-        await api('/api/init', { method: 'POST' })
-        setInitialized(true)
-
-        const list = await api<Member[]>('/api/members')
-        setMembers(list)
-
-        // 如果没有当前成员，默认选第一个孩子
-        if (!currentMemberId && list.length > 0) {
-          const child = list.find((m) => m.role === 'child') || list[0]
-          setCurrentMember(child.id)
-        }
-      } catch (e) {
-        console.error('初始化失败', e)
-      } finally {
-        setLoading(false)
+  // 加载成员（已登录时）
+  const loadMembers = async () => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+    try {
+      const list = await api<Member[]>('/api/members')
+      setMembers(list)
+      if (!currentMemberId && list.length > 0) {
+        const child = list.find((m) => m.role === 'child') || list[0]
+        setCurrentMember(child.id)
       }
-    })()
-  }, [])
+    } catch (e: any) {
+      // 401 会自动跳登录，这里兜底
+      if (e.message !== '未登录') {
+        console.error('加载成员失败', e)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadMembers()
+  }, [token])
 
   const refreshMembers = async () => {
     const list = await api<Member[]>('/api/members')
     setMembers(list)
   }
 
-  const currentMember = members.find((m) => m.id === currentMemberId) || null
+  // 未登录 → 显示登录页
+  if (!token) {
+    return <LoginDialog onLoginSuccess={() => setLoading(true)} />
+  }
 
   if (loading) {
     return (
@@ -59,18 +66,7 @@ export function AppShell() {
     )
   }
 
-  if (!initialized || members.length === 0) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 bg-background">
-        <div className="text-5xl">🤔</div>
-        <div className="text-center">
-          <div className="text-lg font-semibold mb-1">还没有家庭成员</div>
-          <div className="text-sm text-muted-foreground">请在下方添加第一个家庭成员</div>
-        </div>
-        <FamilyTab members={members} onChange={refreshMembers} />
-      </div>
-    )
-  }
+  const currentMember = members.find((m) => m.id === currentMemberId) || null
 
   const tabs: { key: Tab; label: string; icon: typeof Home }[] = [
     { key: 'home', label: '首页', icon: Home },

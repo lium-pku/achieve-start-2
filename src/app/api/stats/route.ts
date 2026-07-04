@@ -1,28 +1,22 @@
 import { db } from '@/lib/db'
-import { ok } from '@/lib/time-utils'
+import { ok, fail } from '@/lib/time-utils'
+import { getContext } from '@/lib/auth'
 
 // 统计 API
-// GET /api/stats?memberId=xxx&period=weekly&offset=0
-//   period: "weekly" | "monthly"
-//   offset: 0=本周/本月, 1=上周/上月, 2=上上周...
-// 返回：
-//   - completionRate: 任务完成率 (0-100)
-//   - onTimeRate: 按时完成率 (0-100)
-//   - pointsEarned: 获得积分
-//   - pointsPenalty: 扣除积分
-//   - pointsNet: 净增积分
-//   - totalTasks: 总任务数
-//   - completedTasks: 已完成任务数
-//   - onTimeTasks: 按时完成任务数
-//   - periodStart, periodEnd
-//   - trend: 最近 4 个周期的趋势数据
 export async function GET(req: Request) {
+  const ctx = getContext(req)
   const { searchParams } = new URL(req.url)
   const memberId = searchParams.get('memberId')
   const period = searchParams.get('period') || 'weekly'
   const offset = Number(searchParams.get('offset') || '0')
 
-  if (!memberId) return ok({ error: '缺少 memberId' })
+  if (!memberId) return fail('缺少 memberId')
+
+  // 校验 memberId 属于当前 family
+  const member = await db.member.findFirst({
+    where: { id: memberId, familyId: ctx.familyId },
+  })
+  if (!member) return fail('成员不存在或无权访问', 404)
 
   // 计算周期范围
   const now = new Date()
@@ -30,7 +24,6 @@ export async function GET(req: Request) {
   let periodEnd: Date
 
   if (period === 'weekly') {
-    // 周一为一周开始
     const day = now.getDay()
     const diffToMonday = day === 0 ? -6 : 1 - day
     const thisMonday = new Date(now)
@@ -41,7 +34,6 @@ export async function GET(req: Request) {
     periodEnd = new Date(periodStart)
     periodEnd.setDate(periodEnd.getDate() + 7)
   } else {
-    // 月度
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     periodStart = new Date(thisMonthStart)
     periodStart.setMonth(periodStart.getMonth() - offset)
@@ -52,22 +44,18 @@ export async function GET(req: Request) {
   // 查询该周期内的活动日志
   const logs = await db.activityLog.findMany({
     where: {
+      familyId: ctx.familyId,
       memberId,
-      occurrenceDate: {
-        gte: periodStart,
-        lt: periodEnd,
-      },
+      occurrenceDate: { gte: periodStart, lt: periodEnd },
     },
   })
 
   // 查询该周期内的积分流水
   const txs = await db.pointTransaction.findMany({
     where: {
+      familyId: ctx.familyId,
       memberId,
-      createdAt: {
-        gte: periodStart,
-        lt: periodEnd,
-      },
+      createdAt: { gte: periodStart, lt: periodEnd },
     },
   })
 
@@ -118,12 +106,14 @@ export async function GET(req: Request) {
 
     const tLogs = await db.activityLog.findMany({
       where: {
+        familyId: ctx.familyId,
         memberId,
         occurrenceDate: { gte: tStart, lt: tEnd },
       },
     })
     const tTxs = await db.pointTransaction.findMany({
       where: {
+        familyId: ctx.familyId,
         memberId,
         createdAt: { gte: tStart, lt: tEnd },
       },

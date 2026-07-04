@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { ok, fail, addPoints } from '@/lib/time-utils'
+import { getContext, requireParent } from '@/lib/auth'
 
 // 批量审核打卡记录
-// body: { logIds: string[], action: "approve" | "reject", verifiedById: string }
 export async function POST(req: Request) {
+  const ctx = getContext(req)
+  const err = requireParent(ctx)
+  if (err) return err
+
   const body = await req.json()
   const { logIds, action, verifiedById } = body
 
@@ -12,21 +16,23 @@ export async function POST(req: Request) {
   if (!['approve', 'reject'].includes(action)) return fail('action 必须为 approve / reject')
   if (!verifiedById) return fail('缺少 verifiedById')
 
-  const verifier = await db.member.findUnique({ where: { id: verifiedById } })
-  if (!verifier) return fail('审核人不存在')
-  if (verifier.role !== 'mom' && verifier.role !== 'dad') return fail('只有家长才能审核')
+  // 校验 verifiedById 属于当前 family
+  const verifier = await db.member.findFirst({
+    where: { id: verifiedById, familyId: ctx.familyId },
+  })
+  if (!verifier) return fail('审核人不存在或无权访问')
 
+  // 查待审核 logs（带 familyId 隔离）
   const logs = await db.activityLog.findMany({
     where: {
       id: { in: logIds },
+      familyId: ctx.familyId,
       status: 'pending_verification',
     },
     include: { activity: true },
   })
 
-  if (logs.length === 0) {
-    return ok({ processed: 0, message: '没有待审核的记录' })
-  }
+  if (logs.length === 0) return ok({ processed: 0, message: '没有待审核的记录' })
 
   const now = new Date()
 

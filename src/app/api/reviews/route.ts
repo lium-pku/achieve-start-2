@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { ok, fail } from '@/lib/time-utils'
+import { getContext } from '@/lib/auth'
 
 // 获取点评列表
-// GET /api/reviews?periodType=weekly&memberId=xxx
-// 不传 memberId 则返回所有点评
 export async function GET(req: Request) {
+  const ctx = getContext(req)
   const { searchParams } = new URL(req.url)
   const periodType = searchParams.get('periodType')
 
   const reviews = await db.review.findMany({
     where: {
+      familyId: ctx.familyId,
       ...(periodType && { periodType }),
     },
     include: { author: true },
@@ -19,8 +20,9 @@ export async function GET(req: Request) {
   return ok(reviews)
 }
 
-// 新建点评
+// 新建点评（所有成员都能写）
 export async function POST(req: Request) {
+  const ctx = getContext(req)
   const body = await req.json()
   const { periodType, periodStart, periodEnd, authorId, content } = body
 
@@ -31,11 +33,15 @@ export async function POST(req: Request) {
     return fail('periodType 必须为 weekly / monthly')
   }
 
-  const author = await db.member.findUnique({ where: { id: authorId } })
-  if (!author) return fail('作者不存在')
+  // 校验 authorId 属于当前 family
+  const author = await db.member.findFirst({
+    where: { id: authorId, familyId: ctx.familyId },
+  })
+  if (!author) return fail('作者不存在或无权访问')
 
   const review = await db.review.create({
     data: {
+      familyId: ctx.familyId,
       periodType,
       periodStart: new Date(periodStart),
       periodEnd: new Date(periodEnd),

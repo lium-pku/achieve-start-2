@@ -89,6 +89,7 @@ export function isOnTime(activity: { deadline: string | null }, now: Date = new 
 }
 
 // 给成员加分（同时更新 totalPoints，并写入流水）
+// 使用事务保证原子性，自动处理 familyId
 export async function addPoints(opts: {
   memberId: string
   amount: number
@@ -97,34 +98,42 @@ export async function addPoints(opts: {
   activityId?: string
 }) {
   const { memberId, amount, type, reason, activityId } = opts
-  // 扣分不能让积分低于0
-  let actualAmount = amount
-  if (amount < 0) {
-    const member = await db.member.findUnique({ where: { id: memberId } })
-    const currentPoints = member?.totalPoints ?? 0
-    if (currentPoints <= 0) {
-      actualAmount = 0
-    } else if (currentPoints + amount < 0) {
-      actualAmount = -currentPoints
-    }
-  }
 
-  if (actualAmount !== 0) {
-    await db.pointTransaction.create({
-      data: {
-        memberId,
-        amount: actualAmount,
-        type,
-        reason,
-        activityId: activityId ?? null,
-      },
-    })
-    await db.member.update({
+  return db.$transaction(async (tx) => {
+    const member = await tx.member.findUnique({
       where: { id: memberId },
-      data: { totalPoints: { increment: actualAmount } },
+      select: { totalPoints: true, familyId: true },
     })
-  }
-  return actualAmount
+    if (!member) throw new Error('成员不存在')
+
+    // 扣分不能让积分低于0
+    let actualAmount = amount
+    if (amount < 0) {
+      if (member.totalPoints <= 0) {
+        actualAmount = 0
+      } else if (member.totalPoints + amount < 0) {
+        actualAmount = -member.totalPoints
+      }
+    }
+
+    if (actualAmount !== 0) {
+      await tx.pointTransaction.create({
+        data: {
+          familyId: member.familyId,
+          memberId,
+          amount: actualAmount,
+          type,
+          reason,
+          activityId: activityId ?? null,
+        },
+      })
+      await tx.member.update({
+        where: { id: memberId },
+        data: { totalPoints: { increment: actualAmount } },
+      })
+    }
+    return actualAmount
+  })
 }
 
 // 返回统一 JSON 响应

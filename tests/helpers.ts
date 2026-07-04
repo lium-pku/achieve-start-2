@@ -1,13 +1,47 @@
 const BASE_URL = 'http://localhost:3000'
 
-// 通用 API 调用（不依赖 Playwright page）
+// === 登录态管理 ===
+let _token: string | null = null
+let _user: any = null
+
+export async function login(code = 'test-mom'): Promise<{ token: string; user: any }> {
+  const res = await fetch(`${BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `登录失败 (${res.status})`)
+  _token = data.token
+  _user = data.user
+  return data
+}
+
+export function getToken(): string | null {
+  return _token
+}
+
+export function getCurrentUser() {
+  return _user
+}
+
+// 切换身份（同一家庭内）
+export async function switchRole(code: 'test-mom' | 'test-dad' | 'test-child') {
+  return login(code)
+}
+
+// === 通用 API 调用（自动带 token）===
 export async function api<T = any>(
   path: string,
   options: { method?: string; body?: any } = {}
 ): Promise<T> {
+  if (!_token) await login('test-mom') // 兜底自动登录
   const res = await fetch(`${BASE_URL}${path}`, {
     method: options.method || 'GET',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${_token}`,
+    },
     body: options.body ? JSON.stringify(options.body) : undefined,
   })
   const data = await res.json()
@@ -19,6 +53,7 @@ export async function api<T = any>(
 
 export interface Member {
   id: string
+  familyId?: string
   name: string
   role: 'child' | 'mom' | 'dad'
   avatar: string
@@ -128,16 +163,10 @@ export async function updateActivityTime(
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// 测试专用：彻底重置所有数据（清空全部 9 张表）
-export async function resetAll(): Promise<void> {
-  await api('/api/test/reset', { method: 'POST' })
-}
-
 // 测试专用：重置并写入固定初始数据
-// 每次测试前调用，确保从完全相同的状态开始
-// 固定数据：3 成员(积分0) + 5 活动 + 3 鼓励 + 2 奖励，无打卡/流水/目标/点评
+// 使用当前 token 的 familyId
 export async function resetAndSeed(): Promise<void> {
-  await resetAll()
+  if (!_token) await login('test-mom')
   await api('/api/test/seed', { method: 'POST' })
 }
 
@@ -223,11 +252,6 @@ export async function deleteReward(rewardId: string): Promise<void> {
 // === 积分流水 ===
 export async function getPointTransactions(memberId: string): Promise<any[]> {
   return api(`/api/points/${memberId}`)
-}
-
-// === 初始化 ===
-export async function initSeed(): Promise<any> {
-  return api('/api/init', { method: 'POST' })
 }
 
 // === 目标 ===

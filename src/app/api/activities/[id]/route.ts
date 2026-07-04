@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { ok, fail } from '@/lib/time-utils'
+import { getContext, requireParent } from '@/lib/auth'
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const ctx = getContext(req)
+  const err = requireParent(ctx)
+  if (err) return err
+
+  // 确认 activity 属于当前 family
+  const existing = await db.activity.findFirst({
+    where: { id, familyId: ctx.familyId },
+  })
+  if (!existing) return fail('活动不存在或无权访问', 404)
+
   const body = await req.json()
   const activity = await db.activity.update({
     where: { id },
@@ -25,7 +36,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  // 软删除：将 active 设为 false
+  const ctx = getContext(_req)
+  const err = requireParent(ctx)
+  if (err) return err
+
+  const existing = await db.activity.findFirst({
+    where: { id, familyId: ctx.familyId },
+  })
+  if (!existing) return fail('活动不存在或无权访问', 404)
+
+  // 软删除
   await db.activity.update({ where: { id }, data: { active: false } })
   return ok({ deleted: true })
 }

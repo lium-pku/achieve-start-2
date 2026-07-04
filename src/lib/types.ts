@@ -93,18 +93,40 @@ export interface RewardRedemption {
   member: Member
 }
 
-// 简单 API 客户端
+// 简单 API 客户端（自动从 localStorage 读 token）
 export async function api<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  // 从 localStorage 读 token
+  let token: string | null = null
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('kids-time-store')
+      if (raw) token = JSON.parse(raw)?.state?.token ?? null
+    } catch {}
+  }
+
   const res = await fetch(path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   })
+
+  if (res.status === 401) {
+    // token 失效，清空登录态
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('kids-time-store')
+        window.location.reload()
+      } catch {}
+    }
+    throw new Error('未登录')
+  }
+
   const data = await res.json()
   if (!res.ok) {
     throw new Error(data.error || `请求失败 (${res.status})`)

@@ -1,44 +1,57 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getContext } from '@/lib/auth'
+import { ok, fail } from '@/lib/time-utils'
 
-// 测试专用：写入固定的初始测试数据（仅开发环境）
-// 确保每次测试从完全相同的状态开始
-// 数据特征：
-//   - 3 个成员（小宇/妈妈/爸爸），积分均为 0
-//   - 3 个日度活动（截止时间设为 23:59，确保测试时不会超时）
-//   - 1 个周度活动（每周六）
-//   - 1 个月度活动（每月 1 号）
-//   - 3 个鼓励阈值（20/50/100）
-//   - 2 个奖励（30 分 / 80 分）
-//   - 无任何打卡记录、积分流水、目标、点评
-export async function POST() {
+// 测试专用：按 familyId 清空 + 重写固定种子数据
+// 调用前需带 token（middleware 放行但需要 ctx）
+export async function POST(req: Request) {
   if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: '生产环境禁用' }, { status: 403 })
+    return fail('生产环境禁用')
   }
 
-  // 如果已有数据，先清空（保证幂等）
-  await db.review.deleteMany()
-  await db.goal.deleteMany()
-  await db.rewardRedemption.deleteMany()
-  await db.pointTransaction.deleteMany()
-  await db.activityLog.deleteMany()
-  await db.encouragement.deleteMany()
-  await db.reward.deleteMany()
-  await db.activity.deleteMany()
-  await db.member.deleteMany()
+  let ctx
+  try {
+    ctx = getContext(req)
+  } catch {
+    return fail('未授权', 401)
+  }
+  const familyId = ctx.familyId
 
-  // 1. 创建 3 个成员
-  const child = await db.member.create({
-    data: { name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C', totalPoints: 0 },
-  })
-  const mom = await db.member.create({
-    data: { name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899', totalPoints: 0 },
-  })
-  const dad = await db.member.create({
-    data: { name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981', totalPoints: 0 },
-  })
+  // ① 清空当前 familyId 下所有业务数据（保留 Member，因为 User.memberId 依赖它）
+  await db.review.deleteMany({ where: { familyId } })
+  await db.goal.deleteMany({ where: { familyId } })
+  await db.rewardRedemption.deleteMany({ where: { familyId } })
+  await db.pointTransaction.deleteMany({ where: { familyId } })
+  await db.activityLog.deleteMany({ where: { familyId } })
+  await db.encouragement.deleteMany({ where: { familyId } })
+  await db.reward.deleteMany({ where: { familyId } })
+  await db.activity.deleteMany({ where: { familyId } })
 
-  // 2. 创建 5 个活动（截止时间都设为 23:59，避免测试时超时）
+  // ② 重置 Member 积分为 0（Member 不删，复用）
+  await db.member.updateMany({ where: { familyId }, data: { totalPoints: 0 } })
+
+  // ③ 查找或创建 3 个成员（按角色）
+  let child = await db.member.findFirst({ where: { familyId, role: 'child' } })
+  if (!child) {
+    child = await db.member.create({
+      data: { familyId, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C' },
+    })
+  }
+  let mom = await db.member.findFirst({ where: { familyId, role: 'mom' } })
+  if (!mom) {
+    mom = await db.member.create({
+      data: { familyId, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899' },
+    })
+  }
+  let dad = await db.member.findFirst({ where: { familyId, role: 'dad' } })
+  if (!dad) {
+    dad = await db.member.create({
+      data: { familyId, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981' },
+    })
+  }
+
+  // ④ 写 5 个活动（截止时间统一 23:59，避免测试超时）
   const activities = [
     {
       title: '起床洗漱',
@@ -94,30 +107,30 @@ export async function POST() {
     },
   ]
   for (const a of activities) {
-    await db.activity.create({ data: a })
+    await db.activity.create({ data: { familyId, ...a } })
   }
 
-  // 3. 创建 3 个鼓励阈值
+  // ⑤ 3 个鼓励阈值
   const encouragements = [
     { threshold: 20, title: '初露锋芒', message: '你已经攒了 20 分啦！', icon: '🌱' },
     { threshold: 50, title: '进步小达人', message: '50 分达成，你真棒！', icon: '⭐' },
     { threshold: 100, title: '勤奋小标兵', message: '100 分！你是时间管理小能手！', icon: '🏆' },
   ]
   for (const e of encouragements) {
-    await db.encouragement.create({ data: e })
+    await db.encouragement.create({ data: { familyId, ...e } })
   }
 
-  // 4. 创建 2 个奖励
+  // ⑥ 2 个奖励
   const rewards = [
     { title: '看 30 分钟动画片', icon: '📺', pointsCost: 30, createdById: mom.id },
     { title: '去公园玩 2 小时', icon: '🎠', pointsCost: 80, createdById: dad.id },
   ]
   for (const r of rewards) {
-    await db.reward.create({ data: r })
+    await db.reward.create({ data: { familyId, ...r } })
   }
 
-  return NextResponse.json({
-    message: '固定测试数据已写入',
+  return ok({
+    message: '测试数据已重置',
     members: { child: child.id, mom: mom.id, dad: dad.id },
     counts: {
       activities: activities.length,

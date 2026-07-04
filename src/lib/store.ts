@@ -2,8 +2,7 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-export type Role = 'child' | 'mom' | 'dad'
+import type { Role } from '@/lib/auth'
 
 export interface Member {
   id: string
@@ -14,11 +13,23 @@ export interface Member {
   totalPoints: number
 }
 
+export interface AuthUser {
+  id: string
+  familyId: string
+  role: Role
+  memberId: string | null
+  nickname?: string
+}
+
 interface AppState {
   currentMemberId: string | null
   initialized: boolean
+  token: string | null
+  user: AuthUser | null
   setCurrentMember: (id: string) => void
   setInitialized: (v: boolean) => void
+  setAuth: (token: string, user: AuthUser) => void
+  logout: () => void
   reset: () => void
 }
 
@@ -27,9 +38,15 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       currentMemberId: null,
       initialized: false,
+      token: null,
+      user: null,
       setCurrentMember: (id) => set({ currentMemberId: id }),
       setInitialized: (v) => set({ initialized: v }),
-      reset: () => set({ currentMemberId: null, initialized: false }),
+      setAuth: (token, user) => set({ token, user }),
+      logout: () =>
+        set({ token: null, user: null, currentMemberId: null, initialized: false }),
+      reset: () =>
+        set({ currentMemberId: null, initialized: false, token: null, user: null }),
     }),
     { name: 'kids-time-store' }
   )

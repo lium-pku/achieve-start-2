@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { ok, fail } from '@/lib/time-utils'
+import { getContext, requireParent } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const ctx = getContext(req)
   const list = await db.reward.findMany({
-    where: { active: true },
+    where: { familyId: ctx.familyId, active: true },
     include: { createdBy: true },
     orderBy: { pointsCost: 'asc' },
   })
@@ -12,16 +14,22 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const ctx = getContext(req)
+  const err = requireParent(ctx)
+  if (err) return err
+
   const body = await req.json()
-  const { title, description, icon, pointsCost, createdById } = body
-  if (!title || !pointsCost || !createdById) return fail('缺少 title / pointsCost / createdById')
+  const { title, description, icon, pointsCost } = body
+  if (!title || !pointsCost) return fail('缺少 title / pointsCost')
+
   const reward = await db.reward.create({
     data: {
+      familyId: ctx.familyId,
       title,
       description: description || null,
       icon: icon || '🎁',
       pointsCost: Number(pointsCost),
-      createdById,
+      createdById: ctx.memberId || '',
     },
   })
   return NextResponse.json(reward, { status: 201 })
