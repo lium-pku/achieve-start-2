@@ -65,6 +65,12 @@ download/
 .vscode/
 *.swp
 
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # OS
 Thumbs.db
 
@@ -73,5 +79,5 @@ Thumbs.db
 .claude
 .z-ai-config
 prompt
-test
+/test
 local-*
