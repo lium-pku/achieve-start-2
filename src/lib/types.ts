@@ -1,4 +1,6 @@
 // 前端类型定义（与后端 Prisma 模型对应）
+import { useAppStore } from '@/lib/store'
+
 export type Role = 'child' | 'mom' | 'dad'
 export type ScheduleType = 'daily' | 'weekly' | 'monthly'
 
@@ -93,19 +95,13 @@ export interface RewardRedemption {
   member: Member
 }
 
-// 简单 API 客户端（自动从 localStorage 读 token）
+// 简单 API 客户端（从 zustand store 读 token）
 export async function api<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  // 从 localStorage 读 token
-  let token: string | null = null
-  if (typeof window !== 'undefined') {
-    try {
-      const raw = localStorage.getItem('kids-time-store')
-      if (raw) token = JSON.parse(raw)?.state?.token ?? null
-    } catch {}
-  }
+  // 从 zustand store 读 token（同步，避免 localStorage 异步写入的竞态）
+  const token = useAppStore.getState().token
 
   const res = await fetch(path, {
     ...options,
@@ -117,11 +113,10 @@ export async function api<T = any>(
   })
 
   if (res.status === 401) {
-    // token 失效，清空登录态
+    // token 失效，清空登录态（不 reload，让 app-shell 自然回到登录页）
     if (typeof window !== 'undefined') {
       try {
-        localStorage.removeItem('kids-time-store')
-        window.location.reload()
+        useAppStore.getState().logout()
       } catch {}
     }
     throw new Error('未登录')
