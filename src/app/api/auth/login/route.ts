@@ -6,7 +6,10 @@ import { ok, fail } from '@/lib/time-utils'
 // 登录端点
 // body: { code }
 // mock 模式：code → openid 固定映射 `mock_openid_${code}`
-// 首次登录自动创建 Family + 3 个默认 Member + User（默认 mom 角色）
+// 同一"家庭前缀"的 code 归同一家庭：
+//   test-mom / test-dad / test-child → 同一家庭（前缀 test）
+//   family-b-mom / family-b-dad → 另一家庭（前缀 family-b）
+// 首次某家庭前缀登录时创建 Family + 3 个默认 Member
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}))
   const { code } = body
@@ -15,6 +18,9 @@ export async function POST(req: Request) {
   // mock openid
   const openid = `mock_openid_${code}`
 
+  // 解析家庭前缀：去掉 -mom/-dad/-child 后缀
+  const familyPrefix = code.replace(/-(mom|dad|child)$/, '')
+
   // 查 User
   let user = await db.user.findUnique({
     where: { openid },
@@ -22,34 +28,49 @@ export async function POST(req: Request) {
   })
 
   if (!user) {
-    // 首次登录：创建 Family + 3 个默认 Member + User
-    const family = await db.family.create({ data: { name: '我的家庭' } })
-    const child = await db.member.create({
-      data: { familyId: family.id, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C' },
-    })
-    const mom = await db.member.create({
-      data: { familyId: family.id, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899' },
-    })
-    const dad = await db.member.create({
-      data: { familyId: family.id, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981' },
+    // 查该家庭前缀是否已有 Family（通过查同前缀的其他 User）
+    // 简化：用 familyPrefix 作为 family.name 查找
+    let family = await db.family.findFirst({
+      where: { name: familyPrefix },
     })
 
-    // 根据 code 推断角色
+    if (!family) {
+      // 首次该前缀登录，创建 Family + 3 个默认 Member
+      family = await db.family.create({ data: { name: familyPrefix } })
+      await db.member.create({
+        data: { familyId: family.id, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C' },
+      })
+      await db.member.create({
+        data: { familyId: family.id, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899' },
+      })
+      await db.member.create({
+        data: { familyId: family.id, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981' },
+      })
+    }
+
+    // 查该家庭对应角色的 Member
     let role = 'mom'
-    let memberId = mom.id
     let nickname = '妈妈'
-    if (code.startsWith('dad')) {
+    if (code.endsWith('dad')) {
       role = 'dad'
-      memberId = dad.id
       nickname = '爸爸'
-    } else if (code.startsWith('child')) {
+    } else if (code.endsWith('child')) {
       role = 'child'
-      memberId = child.id
       nickname = '小宇'
     }
 
+    const member = await db.member.findFirst({
+      where: { familyId: family.id, role },
+    })
+
     user = await db.user.create({
-      data: { familyId: family.id, openid, role, memberId, nickname },
+      data: {
+        familyId: family.id,
+        openid,
+        role,
+        memberId: member?.id || null,
+        nickname,
+      },
       include: { family: true },
     })
   }

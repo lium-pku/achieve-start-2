@@ -18,7 +18,7 @@ export function AppShell() {
   const [tab, setTab] = useState<Tab>('home')
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
-  const { currentMemberId, token, setCurrentMember, logout } = useAppStore()
+  const { currentMemberId, token, user, setCurrentMember, logout } = useAppStore()
 
   // 加载成员（已登录时）
   const loadMembers = async () => {
@@ -29,12 +29,16 @@ export function AppShell() {
     try {
       const list = await api<Member[]>('/api/members')
       setMembers(list)
-      if (!currentMemberId && list.length > 0) {
-        const child = list.find((m) => m.role === 'child') || list[0]
-        setCurrentMember(child.id)
+      // 登录后默认用 user.memberId（登录身份对应的成员）
+      if (!currentMemberId) {
+        if (user?.memberId) {
+          setCurrentMember(user.memberId)
+        } else if (list.length > 0) {
+          const child = list.find((m) => m.role === 'child') || list[0]
+          setCurrentMember(child.id)
+        }
       }
     } catch (e: any) {
-      // 401 会自动跳登录，这里兜底
       if (e.message !== '未登录') {
         console.error('加载成员失败', e)
       }
