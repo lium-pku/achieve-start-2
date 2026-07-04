@@ -221,3 +221,56 @@ export async function getPointTransactions(memberId: string): Promise<any[]> {
 export async function initSeed(): Promise<any> {
   return api('/api/init', { method: 'POST' })
 }
+
+// === 目标 ===
+export async function getGoals(memberId?: string): Promise<any[]> {
+  const url = memberId ? `/api/goals?memberId=${memberId}` : '/api/goals'
+  return api<any[]>(url)
+}
+
+export async function createGoal(data: {
+  title: string
+  memberId: string
+  description?: string
+  deadline?: string
+  status?: string
+}): Promise<any> {
+  return api('/api/goals', { method: 'POST', body: data })
+}
+
+export async function updateGoal(goalId: string, data: any): Promise<any> {
+  return api(`/api/goals/${goalId}`, { method: 'PATCH', body: data })
+}
+
+export async function deleteGoal(goalId: string): Promise<void> {
+  await api(`/api/goals/${goalId}`, { method: 'DELETE' })
+}
+
+// === 点评 ===
+export async function getReviews(periodType?: string): Promise<any[]> {
+  const url = periodType ? `/api/reviews?periodType=${periodType}` : '/api/reviews'
+  return api<any[]>(url)
+}
+
+export async function createReview(data: {
+  periodType: 'weekly' | 'monthly'
+  periodStart: string
+  periodEnd: string
+  authorId: string
+  content: string
+}): Promise<any> {
+  return api('/api/reviews', { method: 'POST', body: data })
+}
+
+export async function deleteReview(reviewId: string): Promise<void> {
+  await api(`/api/reviews/${reviewId}`, { method: 'DELETE' })
+}
+
+// === 统计 ===
+export async function getStats(
+  memberId: string,
+  period: 'weekly' | 'monthly',
+  offset = 0
+): Promise<any> {
+  return api(`/api/stats?memberId=${memberId}&period=${period}&offset=${offset}`)
+}

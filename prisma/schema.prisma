@@ -26,6 +26,8 @@ model Member {
   createdActivities Activity[]      @relation("CreatedActivities")
   assignedActivities Activity[]     @relation("AssignedActivities")
   createdRewards    Reward[]
+  goals             Goal[]
+  reviews           Review[]
 }
 
 // 活动 / 日程条目
@@ -139,4 +141,37 @@ model Encouragement {
   message     String
   icon        String   @default("🌟")
   createdAt   DateTime @default(now())
+}
+
+// 个人长期目标
+model Goal {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  // not_started: 未开始
+  // in_progress: 进行中
+  // achieved: 已达成
+  status      String   @default("not_started")
+  deadline    DateTime?
+  memberId    String   // 归属成员
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  member      Member   @relation(fields: [memberId], references: [id])
+}
+
+// 复盘点评（针对周期）
+model Review {
+  id          String   @id @default(cuid())
+  // weekly: 周报点评
+  // monthly: 月报点评
+  periodType  String   // "weekly" | "monthly"
+  periodStart DateTime // 周期开始日期
+  periodEnd   DateTime  // 周期结束日期
+  authorId    String   // 点评人
+  content     String   // 点评内容
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  author      Member   @relation(fields: [authorId], references: [id])
 }

@@ -7,10 +7,11 @@ import { HomeTab } from '@/components/tabs/home-tab'
 import { ScheduleTab } from '@/components/tabs/schedule-tab'
 import { RewardsTab } from '@/components/tabs/rewards-tab'
 import { FamilyTab } from '@/components/tabs/family-tab'
+import { PlanningTab } from '@/components/tabs/planning-tab'
 import { MemberSwitcher } from '@/components/shared/member-switcher'
-import { Home, CalendarDays, Gift, Users } from 'lucide-react'
+import { Home, CalendarDays, Gift, Users, Target } from 'lucide-react'
 
-type Tab = 'home' | 'schedule' | 'rewards' | 'family'
+type Tab = 'home' | 'schedule' | 'rewards' | 'planning' | 'family'
 
 export function AppShell() {
   const [tab, setTab] = useState<Tab>('home')
@@ -75,6 +76,7 @@ export function AppShell() {
     { key: 'home', label: '首页', icon: Home },
     { key: 'schedule', label: '日程', icon: CalendarDays },
     { key: 'rewards', label: '奖励', icon: Gift },
+    { key: 'planning', label: '规划', icon: Target },
     { key: 'family', label: '家庭', icon: Users },
   ]
 
@@ -123,6 +125,13 @@ export function AppShell() {
             onPointsChanged={refreshMembers}
           />
         )}
+        {tab === 'planning' && currentMember && (
+          <PlanningTab
+            currentMember={currentMember}
+            members={members}
+            onPointsChanged={refreshMembers}
+          />
+        )}
         {tab === 'family' && (
           <FamilyTab members={members} onChange={refreshMembers} />
         )}
@@ -130,19 +139,19 @@ export function AppShell() {
 
       {/* 底部导航 */}
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-card/95 backdrop-blur-md border-t border-border z-30 pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-4">
+        <div className="grid grid-cols-5">
           {tabs.map(({ key, label, icon: Icon }) => {
             const active = tab === key
             return (
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors ${
+                className={`flex flex-col items-center justify-center gap-0.5 py-2 transition-colors ${
                   active ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${active ? 'scale-110' : ''} transition-transform`} />
-                <span className="text-[11px] font-medium">{label}</span>
+                <Icon className={`w-[18px] h-[18px] ${active ? 'scale-110' : ''} transition-transform`} />
+                <span className="text-[10px] font-medium">{label}</span>
               </button>
             )
           })}
