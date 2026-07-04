@@ -32,6 +32,7 @@ export function HomeTab({ currentMember, members, onPointsChanged }: Props) {
   const [logs, setLogs] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState<string | null>(null)
+  const [pendingRefreshKey, setPendingRefreshKey] = useState(0)
 
   const isChild = currentMember.role === 'child'
   const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
@@ -96,6 +97,7 @@ export function HomeTab({ currentMember, members, onPointsChanged }: Props) {
       })
       toast.success(res.message || '打卡成功')
       await loadAll()
+      setPendingRefreshKey((k) => k + 1)
       onPointsChanged()
     } catch (e: any) {
       toast.error(e.message || '完成失败')
@@ -206,8 +208,10 @@ export function HomeTab({ currentMember, members, onPointsChanged }: Props) {
       {/* 待审核面板（仅家长可见） */}
       <PendingVerificationPanel
         currentMember={currentMember}
+        refreshKey={pendingRefreshKey}
         onVerified={() => {
           loadAll()
+          setPendingRefreshKey((k) => k + 1)
           onPointsChanged()
         }}
       />

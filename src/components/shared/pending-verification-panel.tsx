@@ -26,9 +26,10 @@ interface PendingLog {
 interface Props {
   currentMember: Member
   onVerified: () => void
+  refreshKey?: number
 }
 
-export function PendingVerificationPanel({ currentMember, onVerified }: Props) {
+export function PendingVerificationPanel({ currentMember, onVerified, refreshKey }: Props) {
   const [logs, setLogs] = useState<PendingLog[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -49,11 +50,11 @@ export function PendingVerificationPanel({ currentMember, onVerified }: Props) {
 
   useEffect(() => {
     if (isParent) load()
-  }, [isParent, load])
+  }, [isParent, load, refreshKey])
 
   if (!isParent) return null
   if (loading) return null
-  if (logs.length === 0) return null
+  // 即使没有待审核记录，也显示空状态卡片，让家长知道审核入口存在
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -118,91 +119,102 @@ export function PendingVerificationPanel({ currentMember, onVerified }: Props) {
         </Button>
       </div>
 
-      <div className="flex items-center justify-between mb-2 px-1">
-        <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
-          <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
-          全选
-        </label>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="h-7 text-xs bg-emerald-500 hover:bg-emerald-600 text-white"
-            disabled={processing}
-            onClick={() => handleVerify('approve')}
-          >
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            {selected.size > 0 ? `通过选中(${selected.size})` : `全部通过(${logs.length})`}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
-            disabled={processing || selected.size === 0}
-            onClick={() => handleVerify('reject')}
-          >
-            <XCircle className="w-3 h-3 mr-1" />
-            拒绝选中({selected.size})
-          </Button>
+      {logs.length === 0 ? (
+        <div className="py-3 text-center text-[11px] text-muted-foreground">
+          ✅ 暂无待审核记录
+          <div className="mt-1 text-[10px] opacity-80">
+            孩子打卡后，会在这里等待你的审核
+          </div>
         </div>
-      </div>
-
-      <div className="space-y-1.5 max-h-80 overflow-y-auto scroll-area">
-        {logs.map((log) => {
-          const isSelected = selected.has(log.id)
-          return (
-            <div
-              key={log.id}
-              className={`flex items-center gap-2 p-2 rounded-lg bg-card border ${
-                isSelected ? 'border-primary bg-primary/5' : 'border-border'
-              }`}
-            >
-              <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(log.id)} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-sm truncate">{log.activity.title}</span>
-                  {log.activity.scheduledTime && (
-                    <Badge variant="outline" className="text-[9px] h-3.5 px-1">
-                      {log.activity.scheduledTime}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
-                  <span>{log.member.avatar} {log.member.name}</span>
-                  <span className="flex items-center gap-0.5 text-primary">
-                    <Sparkles className="w-2.5 h-2.5" />
-                    {log.pointsAwarded}
-                    {log.bonusAwarded > 0 && (
-                      <span className="text-accent-foreground">+{log.bonusAwarded}</span>
-                    )}
-                  </span>
-                  {log.onTime && (
-                    <Badge className="text-[9px] h-3.5 px-1 bg-accent text-accent-foreground">
-                      按时
-                    </Badge>
-                  )}
-                  {log.operatorId && (
-                    <span className="text-amber-600 flex items-center gap-0.5">
-                      <UserCheck className="w-2.5 h-2.5" /> 代打卡
-                    </span>
-                  )}
-                  <span>
-                    ·{' '}
-                    {new Date(log.completedAt).toLocaleTimeString('zh-CN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-              </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-2 px-1">
+            <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+              <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
+              全选
+            </label>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="h-7 text-xs bg-emerald-500 hover:bg-emerald-600 text-white"
+                disabled={processing}
+                onClick={() => handleVerify('approve')}
+              >
+                <CheckCircle2 className="w-3 h-3 mr-1" />
+                {selected.size > 0 ? `通过选中(${selected.size})` : `全部通过(${logs.length})`}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
+                disabled={processing || selected.size === 0}
+                onClick={() => handleVerify('reject')}
+              >
+                <XCircle className="w-3 h-3 mr-1" />
+                拒绝选中({selected.size})
+              </Button>
             </div>
-          )
-        })}
-      </div>
+          </div>
 
-      {selected.size > 0 && (
-        <div className="mt-2 text-[10px] text-muted-foreground text-center">
-          已选 {selected.size} / {logs.length} 项
-        </div>
+          <div className="space-y-1.5 max-h-80 overflow-y-auto scroll-area">
+            {logs.map((log) => {
+              const isSelected = selected.has(log.id)
+              return (
+                <div
+                  key={log.id}
+                  className={`flex items-center gap-2 p-2 rounded-lg bg-card border ${
+                    isSelected ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
+                >
+                  <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(log.id)} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-sm truncate">{log.activity.title}</span>
+                      {log.activity.scheduledTime && (
+                        <Badge variant="outline" className="text-[9px] h-3.5 px-1">
+                          {log.activity.scheduledTime}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+                      <span>{log.member.avatar} {log.member.name}</span>
+                      <span className="flex items-center gap-0.5 text-primary">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        {log.pointsAwarded}
+                        {log.bonusAwarded > 0 && (
+                          <span className="text-accent-foreground">+{log.bonusAwarded}</span>
+                        )}
+                      </span>
+                      {log.onTime && (
+                        <Badge className="text-[9px] h-3.5 px-1 bg-accent text-accent-foreground">
+                          按时
+                        </Badge>
+                      )}
+                      {log.operatorId && (
+                        <span className="text-amber-600 flex items-center gap-0.5">
+                          <UserCheck className="w-2.5 h-2.5" /> 代打卡
+                        </span>
+                      )}
+                      <span>
+                        ·{' '}
+                        {new Date(log.completedAt).toLocaleTimeString('zh-CN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {selected.size > 0 && (
+            <div className="mt-2 text-[10px] text-muted-foreground text-center">
+              已选 {selected.size} / {logs.length} 项
+            </div>
+          )}
+        </>
       )}
     </Card>
   )
