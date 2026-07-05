@@ -54,12 +54,14 @@ export function getOccurrenceDate(scheduleType: string, date: Date = new Date())
 // 判断给定活动在今天是否应该出现
 // 判断给定活动在指定日期是否应该出现
 // 支持 daily / weekly / monthly / once 四种类型
+// 支持 endDate（截止日期）：超过 endDate 的活动不再出现
 export function isActiveOnDate(activity: {
   scheduleType: string
   dayOfWeek: number | null
   dayOfMonth: number | null
   specificDate: Date | null
   startDate: Date
+  endDate: Date | null
   active: boolean
 }, date: Date = new Date()): boolean {
   if (!activity.active) return false
@@ -69,6 +71,13 @@ export function isActiveOnDate(activity: {
   const startDay = new Date(activity.startDate)
   startDay.setHours(0, 0, 0, 0)
   if (startDay > target) return false
+
+  // 检查截止日期：如果 endDate 已过，活动不再出现
+  if (activity.endDate) {
+    const endDay = new Date(activity.endDate)
+    endDay.setHours(23, 59, 59, 999)
+    if (endDay < target) return false
+  }
 
   if (activity.scheduleType === 'daily') return true
 

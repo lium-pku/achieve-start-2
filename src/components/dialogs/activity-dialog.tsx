@@ -53,6 +53,7 @@ export function ActivityDialog({
   const [specificDate, setSpecificDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('')
   const [deadline, setDeadline] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [points, setPoints] = useState('2')
   const [onTimeBonus, setOnTimeBonus] = useState('1')
   const [assignedToId, setAssignedToId] = useState<string>('')
@@ -69,6 +70,7 @@ export function ActivityDialog({
         setSpecificDate(activity.specificDate ? new Date(activity.specificDate).toISOString().split('T')[0] : '')
         setScheduledTime(activity.scheduledTime || '')
         setDeadline(activity.deadline || '')
+        setEndDate(activity.endDate ? new Date(activity.endDate).toISOString().split('T')[0] : '')
         setPoints(String(activity.points))
         setOnTimeBonus(String(activity.onTimeBonus))
         setAssignedToId(activity.assignedToId || '')
@@ -81,6 +83,7 @@ export function ActivityDialog({
         setSpecificDate(new Date().toISOString().split('T')[0])
         setScheduledTime('')
         setDeadline('')
+        setEndDate('')
         setPoints('2')
         setOnTimeBonus('1')
         setAssignedToId(children[0]?.id || '')
@@ -109,6 +112,7 @@ export function ActivityDialog({
         specificDate: scheduleType === 'once' ? specificDate : null,
         scheduledTime: scheduledTime || null,
         deadline: deadline || null,
+        endDate: endDate || null,
         points: Number(points) || 1,
         onTimeBonus: Number(onTimeBonus) || 0,
         assignedToId: assignedToId || null,
@@ -248,6 +252,16 @@ export function ActivityDialog({
               />
               <p className="text-[10px] text-muted-foreground">超过此时间算超时，无按时奖励</p>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>截止日期（可选）</Label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+            <p className="text-[10px] text-muted-foreground">超过此日期活动自动停止（如学期末）</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

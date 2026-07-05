@@ -30,6 +30,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(body.specificDate !== undefined && {
         specificDate: body.specificDate ? new Date(body.specificDate) : null,
       }),
+      ...(body.endDate !== undefined && {
+        endDate: body.endDate ? new Date(body.endDate) : null,
+      }),
       ...(body.active !== undefined && { active: body.active }),
       ...(body.assignedToId !== undefined && { assignedToId: body.assignedToId }),
     },

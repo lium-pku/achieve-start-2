@@ -59,6 +59,7 @@ export async function POST(req: Request) {
     points,
     onTimeBonus,
     deadline,
+    endDate,
     assignedToId,
   } = body
 
@@ -97,6 +98,7 @@ export async function POST(req: Request) {
       points: Number(points) || 1,
       onTimeBonus: Number(onTimeBonus) || 0,
       deadline: deadline || null,
+      endDate: endDate ? new Date(endDate) : null,
       createdById: ctx.memberId || '',
       assignedToId: assignedToId || null,
     },
