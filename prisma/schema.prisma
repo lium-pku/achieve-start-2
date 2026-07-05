@@ -85,7 +85,8 @@ model Activity {
   scheduledTime String?
   points        Int      @default(1)
   onTimeBonus   Int      @default(0)
-  deadline      String?  // 截止时间 HH:mm
+  deadline      String?  // 截止时间 HH:mm（每天的截止时间）
+  endDate       DateTime? // 截止日期（活动整体失效日期，如学期末）
   startDate     DateTime @default(now())
   active        Boolean  @default(true)
   createdById   String
