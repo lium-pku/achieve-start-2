@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   }
   const familyId = ctx.familyId
 
-  // ① 清空当前 familyId 下所有业务数据（保留 Member，因为 User.memberId 依赖它）
+  // ① 清空当前 familyId 下所有业务数据
   await db.review.deleteMany({ where: { familyId } })
   await db.goal.deleteMany({ where: { familyId } })
   await db.rewardRedemption.deleteMany({ where: { familyId } })
@@ -28,28 +28,34 @@ export async function POST(req: Request) {
   await db.reward.deleteMany({ where: { familyId } })
   await db.activity.deleteMany({ where: { familyId } })
 
-  // ② 重置 Member 积分为 0（Member 不删，复用）
-  await db.member.updateMany({ where: { familyId }, data: { totalPoints: 0 } })
+  // 解除所有 User 的 memberId 关联，然后删除所有 Member（重建干净的）
+  await db.user.updateMany({ where: { familyId }, data: { memberId: null } })
+  await db.member.deleteMany({ where: { familyId } })
 
-  // ③ 查找或创建 3 个成员（按角色）
-  let child = await db.member.findFirst({ where: { familyId, role: 'child' } })
-  if (!child) {
-    child = await db.member.create({
-      data: { familyId, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C' },
-    })
-  }
-  let mom = await db.member.findFirst({ where: { familyId, role: 'mom' } })
-  if (!mom) {
-    mom = await db.member.create({
-      data: { familyId, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899' },
-    })
-  }
-  let dad = await db.member.findFirst({ where: { familyId, role: 'dad' } })
-  if (!dad) {
-    dad = await db.member.create({
-      data: { familyId, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981' },
-    })
-  }
+  // ③ 创建 3 个默认成员（前面已删全部）
+  const child = await db.member.create({
+    data: { familyId, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C' },
+  })
+  const mom = await db.member.create({
+    data: { familyId, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899' },
+  })
+  const dad = await db.member.create({
+    data: { familyId, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981' },
+  })
+
+  // 重新关联 User.memberId（按角色匹配）
+  await db.user.updateMany({
+    where: { familyId, role: 'child' },
+    data: { memberId: child.id },
+  })
+  await db.user.updateMany({
+    where: { familyId, role: 'mom' },
+    data: { memberId: mom.id },
+  })
+  await db.user.updateMany({
+    where: { familyId, role: 'dad' },
+    data: { memberId: dad.id },
+  })
 
   // ④ 写 5 个活动（截止时间统一 23:59，避免测试超时）
   const activities = [
@@ -62,6 +68,7 @@ export async function POST(req: Request) {
       onTimeBonus: 1,
       createdById: mom.id,
       assignedToId: child.id,
+      assignedToIds: child.id,
     },
     {
       title: '吃早餐',
@@ -72,6 +79,7 @@ export async function POST(req: Request) {
       onTimeBonus: 1,
       createdById: mom.id,
       assignedToId: child.id,
+      assignedToIds: child.id,
     },
     {
       title: '完成作业',
@@ -82,6 +90,7 @@ export async function POST(req: Request) {
       onTimeBonus: 2,
       createdById: mom.id,
       assignedToId: child.id,
+      assignedToIds: child.id,
     },
     {
       title: '整理房间',
@@ -93,6 +102,7 @@ export async function POST(req: Request) {
       onTimeBonus: 3,
       createdById: mom.id,
       assignedToId: child.id,
+      assignedToIds: child.id,
     },
     {
       title: '月度总结',
@@ -104,17 +114,30 @@ export async function POST(req: Request) {
       onTimeBonus: 5,
       createdById: dad.id,
       assignedToId: child.id,
+      assignedToIds: child.id,
     },
     {
       title: '临时活动-看牙医',
       scheduleType: 'once',
-      specificDate: new Date(), // 今天
+      specificDate: new Date(),
       scheduledTime: '14:00',
       deadline: '18:00',
       points: 3,
       onTimeBonus: 1,
       createdById: mom.id,
       assignedToId: child.id,
+      assignedToIds: child.id,
+    },
+    {
+      title: '家庭阅读时间',
+      scheduleType: 'daily',
+      scheduledTime: '20:00',
+      deadline: '23:59',
+      points: 3,
+      onTimeBonus: 1,
+      createdById: mom.id,
+      assignedToId: null,
+      assignedToIds: null, // 公共活动：所有孩子
     },
   ]
   for (const a of activities) {

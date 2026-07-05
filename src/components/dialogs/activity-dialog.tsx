@@ -56,7 +56,8 @@ export function ActivityDialog({
   const [endDate, setEndDate] = useState('')
   const [points, setPoints] = useState('2')
   const [onTimeBonus, setOnTimeBonus] = useState('1')
-  const [assignedToId, setAssignedToId] = useState<string>('')
+  const [assignedToIds, setAssignedToIds] = useState<string[]>([])
+  const [isPublic, setIsPublic] = useState(false) // 公共活动（所有孩子）
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -73,7 +74,15 @@ export function ActivityDialog({
         setEndDate(activity.endDate ? new Date(activity.endDate).toISOString().split('T')[0] : '')
         setPoints(String(activity.points))
         setOnTimeBonus(String(activity.onTimeBonus))
-        setAssignedToId(activity.assignedToId || '')
+        // 解析 assignedToIds
+        const ids = (activity as any).assignedToIds
+        if (ids === null || ids === undefined || ids === '') {
+          setIsPublic(true)
+          setAssignedToIds([])
+        } else {
+          setIsPublic(false)
+          setAssignedToIds(ids.split(',').map((s: string) => s.trim()).filter(Boolean))
+        }
       } else {
         setTitle('')
         setDescription('')
@@ -86,7 +95,8 @@ export function ActivityDialog({
         setEndDate('')
         setPoints('2')
         setOnTimeBonus('1')
-        setAssignedToId(children[0]?.id || '')
+        setIsPublic(false)
+        setAssignedToIds(children[0]?.id ? [children[0].id] : [])
       }
     }
   }, [open, activity, defaultScheduleType])
@@ -115,7 +125,7 @@ export function ActivityDialog({
         endDate: endDate || null,
         points: Number(points) || 1,
         onTimeBonus: Number(onTimeBonus) || 0,
-        assignedToId: assignedToId || null,
+        assignedToIds: isPublic ? [] : assignedToIds,
         createdById: currentMember.id,
       }
       if (isEdit && activity) {
@@ -286,19 +296,50 @@ export function ActivityDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>分配给孩子</Label>
-            <Select value={assignedToId} onValueChange={setAssignedToId}>
-              <SelectTrigger>
-                <SelectValue placeholder="不指定" />
-              </SelectTrigger>
-              <SelectContent>
+            <div className="flex items-center justify-between">
+              <Label>分配给孩子</Label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  className="w-3 h-3"
+                />
+                公共活动（所有孩子）
+              </label>
+            </div>
+            {isPublic ? (
+              <div className="text-xs text-muted-foreground py-2 px-3 bg-muted/50 rounded-lg">
+                🌐 公共活动：所有孩子都需要打卡
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
                 {children.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.avatar} {c.name}
-                  </SelectItem>
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setAssignedToIds((prev) =>
+                        prev.includes(c.id)
+                          ? prev.filter((id) => id !== c.id)
+                          : [...prev, c.id]
+                      )
+                    }}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                      assignedToIds.includes(c.id)
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-card border-border hover:bg-muted'
+                    }`}
+                  >
+                    <span className="text-base">{c.avatar}</span>
+                    <span>{c.name}</span>
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
+                {assignedToIds.length === 0 && (
+                  <span className="text-[11px] text-amber-600 self-center">请至少选择一个孩子</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

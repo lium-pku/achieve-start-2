@@ -34,7 +34,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         endDate: body.endDate ? new Date(body.endDate) : null,
       }),
       ...(body.active !== undefined && { active: body.active }),
-      ...(body.assignedToId !== undefined && { assignedToId: body.assignedToId }),
+      ...(body.assignedToIds !== undefined && {
+        assignedToIds: Array.isArray(body.assignedToIds) && body.assignedToIds.length > 0
+          ? body.assignedToIds.join(',')
+          : null,
+        assignedToId: Array.isArray(body.assignedToIds) && body.assignedToIds.length > 0
+          ? body.assignedToIds[0]
+          : null,
+      }),
     },
   })
   return ok(activity)

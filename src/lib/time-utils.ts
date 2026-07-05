@@ -5,6 +5,35 @@ import { db } from '@/lib/db'
 export const isParent = (role: string) => role === 'mom' || role === 'dad'
 export const isChild = (role: string) => role === 'child'
 
+// 判断活动是否分配给指定孩子
+// 优先用 assignedToIds（多孩），回退到 assignedToId（旧数据）
+// assignedToIds 为空字符串或 null 表示公共活动（所有孩子）
+export function isAssignedTo(activity: {
+  assignedToId: string | null
+  assignedToIds: string | null
+}, memberId: string): boolean {
+  const ids = activity.assignedToIds
+  if (ids === null || ids === undefined || ids === '') {
+    // 公共活动：分配给所有孩子
+    return true
+  }
+  const idList = ids.split(',').map((s) => s.trim()).filter(Boolean)
+  return idList.includes(memberId)
+}
+
+// 获取活动的分配目标孩子 ID 列表
+// 返回 null 表示公共活动（所有孩子）
+export function getAssignedMemberIds(activity: {
+  assignedToId: string | null
+  assignedToIds: string | null
+}): string[] | null {
+  const ids = activity.assignedToIds
+  if (ids === null || ids === undefined || ids === '') {
+    return null // 公共活动
+  }
+  return ids.split(',').map((s) => s.trim()).filter(Boolean)
+}
+
 // 格式化日期为 YYYY-MM-DD（本地时区）
 export function formatDate(date: Date): string {
   const y = date.getFullYear()

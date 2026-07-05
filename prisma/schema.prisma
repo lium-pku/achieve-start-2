@@ -90,7 +90,8 @@ model Activity {
   startDate     DateTime @default(now())
   active        Boolean  @default(true)
   createdById   String
-  assignedToId  String?
+  assignedToId  String?  // 兼容旧数据：主分配的孩子
+  assignedToIds String?  // 多孩分配：逗号分隔的 memberId（空=公共活动=所有孩子）
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

@@ -165,9 +165,17 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 // 测试专用：重置并写入固定初始数据
 // 使用当前 token 的 familyId
+// seed 会删除并重建 Member，所以需要重新登录获取新 token
 export async function resetAndSeed(): Promise<void> {
   if (!_token) await login('test-mom')
   await api('/api/test/seed', { method: 'POST' })
+  // seed 重建了 Member，需要重新登录获取新 token（memberId 变了）
+  const currentUser = _user
+  if (currentUser) {
+    // 用相同 code 重新登录
+    const code = _user?.role === 'mom' ? 'test-mom' : _user?.role === 'dad' ? 'test-dad' : 'test-child'
+    await login(code)
+  }
 }
 
 // === 成员 CRUD ===
@@ -194,15 +202,18 @@ export async function updateMember(
 // === 活动 CRUD ===
 export async function createActivity(activity: {
   title: string
-  scheduleType: 'daily' | 'weekly' | 'monthly'
+  scheduleType: 'daily' | 'weekly' | 'monthly' | 'once'
   createdById: string
   assignedToId?: string
+  assignedToIds?: string[] | null
   scheduledTime?: string
   deadline?: string
+  endDate?: string
   points?: number
   onTimeBonus?: number
   dayOfWeek?: number
   dayOfMonth?: number
+  specificDate?: string
   description?: string
 }): Promise<any> {
   return api('/api/activities', { method: 'POST', body: activity })

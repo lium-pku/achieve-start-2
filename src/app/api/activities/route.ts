@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { ok, fail, isActiveOnDate } from '@/lib/time-utils'
+import { ok, fail, isActiveOnDate, isAssignedTo } from '@/lib/time-utils'
 import { getContext, requireParent } from '@/lib/auth'
 
 // 获取活动列表
-// GET /api/activities?today=1&assignedToId=xxx
-// GET /api/activities?date=2026-07-05&assignedToId=xxx  (查指定天)
+// GET /api/activities?today=1&assignedToId=xxx  (查某孩子今日活动，含公共活动)
+// GET /api/activities?date=2026-07-05&assignedToId=xxx
 // GET /api/activities?scheduleType=daily
 export async function GET(req: Request) {
   const ctx = getContext(req)
@@ -13,13 +13,12 @@ export async function GET(req: Request) {
   const scheduleType = searchParams.get('scheduleType')
   const assignedToId = searchParams.get('assignedToId')
   const onlyToday = searchParams.get('today') === '1'
-  const dateStr = searchParams.get('date') // YYYY-MM-DD
+  const dateStr = searchParams.get('date')
 
   let activities = await db.activity.findMany({
     where: {
       familyId: ctx.familyId,
       ...(scheduleType && { scheduleType }),
-      ...(assignedToId && { assignedToId }),
       active: true,
     },
     include: {
@@ -36,6 +35,11 @@ export async function GET(req: Request) {
     activities = activities.filter((a) => isActiveOnDate(a, target))
   } else if (onlyToday) {
     activities = activities.filter((a) => isActiveOnDate(a))
+  }
+
+  // 按分配的孩子过滤（含公共活动）
+  if (assignedToId) {
+    activities = activities.filter((a) => isAssignedTo(a, assignedToId))
   }
 
   return ok(activities)
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
     onTimeBonus,
     deadline,
     endDate,
-    assignedToId,
+    assignedToIds, // 数组：['id1','id2'] 或 null（公共活动）
   } = body
 
   if (!title || !scheduleType) return fail('缺少 title / scheduleType')
@@ -77,13 +81,20 @@ export async function POST(req: Request) {
     return fail('临时活动需指定具体日期 specificDate')
   }
 
-  // 校验 assignedToId 属于当前 family
-  if (assignedToId) {
-    const m = await db.member.findFirst({
-      where: { id: assignedToId, familyId: ctx.familyId },
-    })
-    if (!m) return fail('分配的孩子不存在或无权访问')
+  // 校验 assignedToIds 中的每个孩子都属于当前 family
+  let assignedToIdsStr: string | null = null
+  let primaryAssignedToId: string | null = null
+  if (Array.isArray(assignedToIds) && assignedToIds.length > 0) {
+    for (const mid of assignedToIds) {
+      const m = await db.member.findFirst({
+        where: { id: mid, familyId: ctx.familyId, role: 'child' },
+      })
+      if (!m) return fail(`孩子 ${mid} 不存在或无权访问`)
+    }
+    assignedToIdsStr = assignedToIds.join(',')
+    primaryAssignedToId = assignedToIds[0] // 第一个作为兼容字段
   }
+  // assignedToIds 为空数组或 null = 公共活动（所有孩子）
 
   const activity = await db.activity.create({
     data: {
@@ -100,7 +111,8 @@ export async function POST(req: Request) {
       deadline: deadline || null,
       endDate: endDate ? new Date(endDate) : null,
       createdById: ctx.memberId || '',
-      assignedToId: assignedToId || null,
+      assignedToId: primaryAssignedToId,
+      assignedToIds: assignedToIdsStr,
     },
   })
   return NextResponse.json(activity, { status: 201 })

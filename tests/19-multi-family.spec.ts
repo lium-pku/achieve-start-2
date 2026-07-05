@@ -12,8 +12,10 @@ import {
 
 test.describe('流程 19：多家庭数据隔离（v2.0 核心特性）', () => {
   test('不同家庭的成员互相隔离', async () => {
-    // 家庭 A：test-mom（helpers 默认）
+    // 家庭 A：test-mom（helpers 默认），先 resetAndSeed 清掉测试创建的额外成员
     await login('test-mom')
+    const { resetAndSeed } = await import('./helpers')
+    await resetAndSeed()
     const familyA_members = await getMembers()
     expect(familyA_members.length).toBe(3) // 小宇/妈妈/爸爸
 

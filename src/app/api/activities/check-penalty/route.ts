@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { ok, fail, isActiveToday, getOccurrenceDate, isOnTime, addPoints } from '@/lib/time-utils'
+import { ok, fail, isActiveToday, getOccurrenceDate, isOnTime, addPoints, isAssignedTo } from '@/lib/time-utils'
 import { getContext, requireParent } from '@/lib/auth'
 
 // 检查未完成活动并扣分
@@ -25,9 +25,11 @@ export async function POST(req: Request) {
   const now = new Date()
 
   for (const child of children) {
-    const todays = await db.activity.findMany({
-      where: { familyId: ctx.familyId, active: true, assignedToId: child.id },
+    const allActs = await db.activity.findMany({
+      where: { familyId: ctx.familyId, active: true },
     })
+    // 过滤出分配给该孩子的活动（含公共活动）
+    const todays = allActs.filter((a) => isAssignedTo(a, child.id))
 
     for (const activity of todays) {
       if (!isActiveToday(activity, now)) continue
