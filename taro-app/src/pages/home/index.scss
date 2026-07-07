@@ -1,0 +1,119 @@
+.home-page {
+  padding: 16px;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: #999;
+}
+
+.welcome-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #FF9A3C, #FF7A1C);
+  border-radius: 16px;
+  margin-bottom: 16px;
+
+  .welcome-info {
+    .date { font-size: 12px; color: rgba(255,255,255,0.9); display: block; }
+    .name { font-size: 20px; font-weight: bold; color: #fff; margin-top: 4px; display: block; }
+  }
+
+  .points {
+    text-align: right;
+    .points-num { font-size: 36px; font-weight: bold; color: #fff; display: block; }
+    .points-label { font-size: 11px; color: rgba(255,255,255,0.9); }
+  }
+}
+
+.child-switcher {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  white-space: nowrap;
+
+  .child-btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    flex-shrink: 0;
+
+    &.active {
+      background: #FF9A3C;
+      color: #fff;
+      border-color: #FF9A3C;
+    }
+  }
+}
+
+.pending-panel {
+  background: #fffbeb;
+  border: 2px solid #fcd34d;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 16px;
+
+  .panel-title { font-size: 14px; font-weight: bold; color: #92400e; display: block; margin-bottom: 8px; }
+
+  .pending-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    background: #fff;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    font-size: 13px;
+
+    .pending-name { color: #999; font-size: 11px; }
+  }
+}
+
+.todo-section {
+  .section-title { font-size: 16px; font-weight: bold; display: block; margin-bottom: 12px; }
+
+  .empty { text-align: center; color: #999; padding: 40px 0; font-size: 14px; }
+
+  .todo-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    border: 2px solid #f0f0f0;
+
+    &.done { background: #fefce8; border-color: #fcd34d; }
+
+    .todo-info {
+      .todo-title { font-size: 14px; font-weight: 600; display: block; }
+      .todo-meta { font-size: 11px; color: #999; margin-top: 4px; display: block; }
+    }
+
+    .status-badge {
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      &.pending { background: #fef3c7; color: #92400e; }
+    }
+
+    .checkin-btn {
+      padding: 8px 16px;
+      background: #FF9A3C;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 13px;
+      &.loading { opacity: 0.5; }
+    }
+  }
+}
