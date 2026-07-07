@@ -33,14 +33,17 @@ export function HomeTab({ currentMember, members, onPointsChanged }: Props) {
   const [loading, setLoading] = useState(true)
   const [completing, setCompleting] = useState<string | null>(null)
   const [pendingRefreshKey, setPendingRefreshKey] = useState(0)
+  const [selectedChildId, setSelectedChildId] = useState<string>('')
 
   const isChild = currentMember.role === 'child'
   const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
 
-  // 家长视角下默认显示第一个孩子的任务
+  const children = members.filter((m) => m.role === 'child')
+
+  // 家长视角下默认显示第一个孩子的任务，可通过 selectedChildId 切换
   const childMember = isChild
     ? currentMember
-    : members.find((m) => m.role === 'child') || null
+    : children.find((m) => m.id === selectedChildId) || children[0] || null
 
   const loadAll = useCallback(async () => {
     try {
@@ -204,6 +207,26 @@ export function HomeTab({ currentMember, members, onPointsChanged }: Props) {
           </div>
         )}
       </Card>
+
+      {/* 家长视角下切换孩子 */}
+      {isParent && children.length > 1 && (
+        <div className="flex gap-1 overflow-x-auto scroll-area">
+          {children.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setSelectedChildId(c.id)}
+              className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                childMember?.id === c.id
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card border-border hover:bg-muted'
+              }`}
+            >
+              <span className="text-base">{c.avatar}</span>
+              <span>{c.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* 待审核面板（仅家长可见） */}
       <PendingVerificationPanel

@@ -61,6 +61,8 @@ export function GoalsTab({ currentMember, members }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [filterMemberId, setFilterMemberId] = useState<string>('all')
 
+  const isChild = currentMember.role === 'child'
+
   const load = useCallback(async () => {
     try {
       const list = await api<Goal[]>('/api/goals')
@@ -127,9 +129,11 @@ export function GoalsTab({ currentMember, members }: Props) {
         <h3 className="text-sm font-medium text-muted-foreground">
           共 {goals.length} 个目标
         </h3>
-        <Button size="sm" onClick={handleAdd} className="h-7 text-xs">
-          <Plus className="w-3.5 h-3.5 mr-1" /> 新建目标
-        </Button>
+        {isChild && (
+          <Button size="sm" onClick={handleAdd} className="h-7 text-xs">
+            <Plus className="w-3.5 h-3.5 mr-1" /> 新建目标
+          </Button>
+        )}
       </div>
 
       {/* 成员过滤 */}
@@ -150,9 +154,11 @@ export function GoalsTab({ currentMember, members }: Props) {
             <Card className="p-6 text-center">
               <div className="text-3xl mb-2">🎯</div>
               <p className="text-sm text-muted-foreground mb-3">还没有目标</p>
-              <Button size="sm" variant="outline" onClick={handleAdd}>
-                <Plus className="w-3.5 h-3.5 mr-1" /> 添加第一个目标
-              </Button>
+              {isChild && (
+                <Button size="sm" variant="outline" onClick={handleAdd}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> 添加第一个目标
+                </Button>
+              )}
             </Card>
           ) : (
             <div className="space-y-4">
@@ -223,6 +229,7 @@ export function GoalsTab({ currentMember, members }: Props) {
                                   ))}
                                 </div>
                               </div>
+                              {isChild && (
                               <div className="flex gap-1 shrink-0">
                                 <Button
                                   size="icon"
@@ -241,6 +248,7 @@ export function GoalsTab({ currentMember, members }: Props) {
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                               </div>
+                              )}
                             </div>
                           </Card>
                         )

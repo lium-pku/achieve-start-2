@@ -55,6 +55,7 @@ function getCurrentPeriod(period: 'weekly' | 'monthly', offset: number) {
 }
 
 export function CommentsTab({ currentMember }: Props) {
+  const isChild = currentMember.role === 'child'
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly')
   const [offset, setOffset] = useState(0)
   const [content, setContent] = useState('')
@@ -145,7 +146,8 @@ export function CommentsTab({ currentMember }: Props) {
         </Button>
       </div>
 
-      {/* 写点评 */}
+      {/* 写点评（仅孩子可写） */}
+      {isChild && (
       <Card className="p-3">
         <div className="flex items-center gap-2 mb-2">
           <PenLine className="w-4 h-4 text-primary" />
@@ -167,6 +169,7 @@ export function CommentsTab({ currentMember }: Props) {
           </Button>
         </div>
       </Card>
+      )}
 
       {/* 历史点评 */}
       <div>
