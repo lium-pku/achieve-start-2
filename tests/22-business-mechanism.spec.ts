@@ -87,7 +87,7 @@ test.describe('流程 22：业务机制补全测试', () => {
     expect(updated.memberId).toBe(child.id)
   })
 
-  test('missed 状态的活动不能重新打卡（同一周期）', async () => {
+  test('missed 状态的活动可以重新打卡', async () => {
     const child = await findMemberByRole('child')
     const mom = await findMemberByRole('mom')
 
