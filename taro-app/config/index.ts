@@ -16,6 +16,7 @@ const config = {
   framework: 'react',
   compiler: 'webpack5',
   cache: { enable: false },
+  prebundle: { enable: false },
   mini: {
     postcss: {
       pxtransform: { enable: true, config: {} },
