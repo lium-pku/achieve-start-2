@@ -136,3 +136,115 @@ export async function verify(logIds: string[], action: 'approve' | 'reject', ver
     body: { logIds, action, verifiedById },
   })
 }
+
+// === 日程相关 ===
+
+// 获取活动列表（可按 scheduleType / date / assignedToId 过滤）
+export async function getActivities(params: {
+  scheduleType?: string
+  assignedToId?: string
+  today?: boolean
+  date?: string
+}) {
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== '')
+    .map(([k, v]) => `${k === 'today' ? 'today=1' : `${k}=${v}`}`)
+    .join('&')
+  return api<any[]>(`/api/activities${qs ? '?' + qs : ''}`)
+}
+
+// 获取活动日志
+export async function getActivityLogs(memberId: string, days = 3) {
+  return api<any[]>(`/api/activities/logs?memberId=${memberId}&days=${days}`)
+}
+
+// 创建活动
+export async function createActivity(activity: any) {
+  return api('/api/activities', { method: 'POST', body: activity })
+}
+
+// 更新活动
+export async function updateActivity(activityId: string, data: any) {
+  return api(`/api/activities/${activityId}`, { method: 'PATCH', body: data })
+}
+
+// 删除活动
+export async function deleteActivity(activityId: string) {
+  return api(`/api/activities/${activityId}`, { method: 'DELETE' })
+}
+
+// 获取鼓励阈值
+export async function getEncouragements() {
+  return api<any[]>('/api/encouragements')
+}
+
+// 获取奖励
+export async function getRewards() {
+  return api<any[]>('/api/rewards')
+}
+
+// 获取目标
+export async function getGoals(memberId?: string) {
+  const url = memberId ? `/api/goals?memberId=${memberId}` : '/api/goals'
+  return api<any[]>(url)
+}
+
+// 创建目标
+export async function createGoal(data: any) {
+  return api('/api/goals', { method: 'POST', body: data })
+}
+
+// 更新目标
+export async function updateGoal(goalId: string, data: any) {
+  return api(`/api/goals/${goalId}`, { method: 'PATCH', body: data })
+}
+
+// 删除目标
+export async function deleteGoal(goalId: string) {
+  return api(`/api/goals/${goalId}`, { method: 'DELETE' })
+}
+
+// 获取点评
+export async function getReviews(periodType?: string) {
+  const url = periodType ? `/api/reviews?periodType=${periodType}` : '/api/reviews'
+  return api<any[]>(url)
+}
+
+// 创建点评
+export async function createReview(data: any) {
+  return api('/api/reviews', { method: 'POST', body: data })
+}
+
+// 获取统计
+export async function getStats(memberId: string, period: 'weekly' | 'monthly', offset = 0) {
+  return api<any>(`/api/stats?memberId=${memberId}&period=${period}&offset=${offset}`)
+}
+
+// 获取积分流水
+export async function getPointTransactions(memberId: string) {
+  return api<any[]>(`/api/points/${memberId}`)
+}
+
+// 兑换奖励
+export async function redeem(rewardId: string, memberId: string) {
+  return api('/api/redemptions', { method: 'POST', body: { rewardId, memberId } })
+}
+
+// 获取兑换记录
+export async function getRedemptions(status?: string) {
+  const url = status ? `/api/redemptions?status=${status}` : '/api/redemptions'
+  return api<any[]>(url)
+}
+
+// 审核兑换
+export async function resolveRedemption(redemptionId: string, status: string, resolvedById: string) {
+  return api(`/api/redemptions/${redemptionId}`, {
+    method: 'PATCH',
+    body: { status, resolvedById },
+  })
+}
+
+// 设置成员积分
+export async function setMemberPoints(memberId: string, points: number) {
+  return api(`/api/members/${memberId}`, { method: 'PATCH', body: { totalPoints: points } })
+}
