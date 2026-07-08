@@ -1,0 +1,89 @@
+.family-page { padding: 16px; height: 100vh; box-sizing: border-box; }
+.loading { display: flex; align-items: center; justify-content: center; height: 100vh; color: #999; }
+
+.family-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+  .page-title { font-size: 20px; font-weight: bold; }
+  .add-member-btn {
+    padding: 6px 16px; background: #FF9A3C; color: #fff;
+    border-radius: 8px; font-size: 12px; font-weight: bold;
+  }
+}
+
+.member-list {
+  margin-bottom: 20px;
+  .member-card {
+    display: flex; align-items: center; padding: 12px 16px; background: #fff;
+    border-radius: 12px; margin-bottom: 8px; border: 2px solid #f0f0f0;
+    &.active { border-color: #FF9A3C; background: #fff7ed; }
+  }
+  .member-avatar { font-size: 32px; margin-right: 12px; }
+  .member-info { flex: 1;
+    .member-name { font-size: 15px; font-weight: 600; display: block; }
+    .member-role { font-size: 11px; color: #999; }
+  }
+  .member-points { font-size: 16px; font-weight: bold; color: #FF9A3C; }
+}
+
+.transactions-section {
+  .section-title { font-size: 14px; font-weight: 600; display: block; margin-bottom: 8px; }
+  .transaction-list {
+    max-height: 400px; overflow-y: auto;
+    .transaction-item {
+      display: flex; align-items: center; padding: 8px 12px; background: #fff;
+      border-radius: 8px; margin-bottom: 4px; border-bottom: 1px solid #f0f0f0;
+      .tx-icon {
+        width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+        justify-content: center; margin-right: 12px; font-size: 16px;
+        &.positive { background: #ecfdf5; }
+        &.negative { background: #fef2f2; }
+      }
+      .tx-info { flex: 1; min-width: 0;
+        .tx-reason { font-size: 13px; font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tx-meta { font-size: 10px; color: #999; }
+      }
+      .tx-amount {
+        font-size: 14px; font-weight: bold; flex-shrink: 0;
+        &.positive { color: #10b981; }
+        &.negative { color: #ef4444; }
+      }
+    }
+  }
+}
+
+.usage-info {
+  margin-top: 20px; padding: 12px 16px; background: #f5f5f5; border-radius: 12px;
+  .info-title { font-size: 12px; font-weight: 600; display: block; margin-bottom: 6px; }
+  .info-text { font-size: 11px; color: #666; line-height: 1.6; display: block; }
+}
+
+.empty { text-align: center; padding: 40px 0; color: #999; font-size: 14px; }
+
+/* 弹窗 */
+.dialog-mask {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.dialog-content {
+  width: 80%; max-width: 320px; background: #fff; border-radius: 16px; padding: 20px;
+  .dialog-title { font-size: 16px; font-weight: bold; display: block; margin-bottom: 16px; text-align: center; }
+  .dialog-field { margin-bottom: 12px;
+    .field-label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; }
+    .field-input {
+      width: 100%; height: 40px; padding: 0 12px; border: 2px solid #e0e0e0;
+      border-radius: 8px; font-size: 14px; box-sizing: border-box;
+    }
+    .picker-value {
+      display: block; height: 40px; line-height: 40px; padding: 0 12px; border: 2px solid #e0e0e0;
+      border-radius: 8px; font-size: 14px;
+    }
+  }
+  .dialog-actions { display: flex; gap: 8px; margin-top: 16px;
+    .dialog-btn {
+      flex: 1; text-align: center; padding: 10px 0; border-radius: 8px; font-size: 14px;
+      &.cancel { background: #f0f0f0; color: #666; }
+      &.confirm { background: #FF9A3C; color: #fff; font-weight: bold; }
+    }
+  }
+}

@@ -1,3 +1,3 @@
 export default definePageConfig({
-  navigationBarTitleText: 'planning'
+  navigationBarTitleText: '规划'
 })
