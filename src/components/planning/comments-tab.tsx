@@ -66,13 +66,15 @@ export function CommentsTab({ currentMember }: Props) {
   const load = useCallback(async () => {
     try {
       const list = await api<Review[]>(`/api/reviews?periodType=${period}`)
-      setReviews(list)
+      // 孩子只看自己的点评，家长看全家的
+      const filtered = isChild ? list.filter((r) => r.authorId === currentMember.id) : list
+      setReviews(filtered)
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
-  }, [period])
+  }, [period, isChild, currentMember.id])
 
   useEffect(() => {
     load()

@@ -106,7 +106,7 @@ export function ReviewTab({ currentMember, members }: Props) {
             <TabsTrigger value="monthly" className="text-xs">月报</TabsTrigger>
           </TabsList>
         </Tabs>
-        {members.length > 1 && (
+        {currentMember.role !== 'child' && members.length > 1 && (
           <Tabs value={memberId} onValueChange={setMemberId}>
             <TabsList style={{ display: 'flex' }}>
               {members.map((m) => (

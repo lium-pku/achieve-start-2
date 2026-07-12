@@ -65,14 +65,16 @@ export function GoalsTab({ currentMember, members }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const list = await api<Goal[]>('/api/goals')
+      // 孩子只查自己的目标，家长查全家
+      const url = isChild ? `/api/goals?memberId=${currentMember.id}` : '/api/goals'
+      const list = await api<Goal[]>(url)
       setGoals(list)
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isChild, currentMember.id])
 
   useEffect(() => {
     load()
@@ -136,7 +138,8 @@ export function GoalsTab({ currentMember, members }: Props) {
         )}
       </div>
 
-      {/* 成员过滤 */}
+      {/* 成员过滤（仅家长可见，孩子只看自己的） */}
+      {!isChild && (
       <Tabs value={filterMemberId} onValueChange={setFilterMemberId}>
         <TabsList className="w-full" style={{ display: 'flex' }}>
           <TabsTrigger value="all" className="flex-1 text-xs">全部</TabsTrigger>
@@ -261,6 +264,7 @@ export function GoalsTab({ currentMember, members }: Props) {
           )}
         </TabsContent>
       </Tabs>
+      )}
 
       <GoalDialog
         open={dialogOpen}
