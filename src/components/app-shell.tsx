@@ -56,6 +56,23 @@ export function AppShell() {
     setMembers(list)
   }
 
+  const currentMember = members.find((m) => m.id === currentMemberId) || null
+
+  // 如果 currentMemberId 指向的 member 不存在（如 seed 重建后 id 变了），
+  // 自动用 user.memberId 重新设置
+  useEffect(() => {
+    if (token && members.length > 0 && !currentMember && user?.memberId) {
+      const newMember = members.find((m) => m.id === user.memberId)
+      if (newMember) {
+        setCurrentMember(newMember.id)
+      } else {
+        // user.memberId 也找不到，选第一个孩子
+        const child = members.find((m) => m.role === 'child') || members[0]
+        if (child) setCurrentMember(child.id)
+      }
+    }
+  }, [token, members, currentMember, user, setCurrentMember])
+
   // 未登录 → 显示登录页
   if (!token) {
     return <LoginDialog onLoginSuccess={() => setLoading(true)} />
@@ -69,8 +86,6 @@ export function AppShell() {
       </div>
     )
   }
-
-  const currentMember = members.find((m) => m.id === currentMemberId) || null
 
   const tabs: { key: Tab; label: string; icon: typeof Home }[] = [
     { key: 'home', label: '首页', icon: Home },
