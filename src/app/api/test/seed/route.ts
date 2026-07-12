@@ -32,9 +32,12 @@ export async function POST(req: Request) {
   await db.user.updateMany({ where: { familyId }, data: { memberId: null } })
   await db.member.deleteMany({ where: { familyId } })
 
-  // ③ 创建 3 个默认成员（前面已删全部）
+  // ③ 创建默认成员（前面已删全部）
   const child = await db.member.create({
     data: { familyId, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C' },
+  })
+  const child2 = await db.member.create({
+    data: { familyId, name: '小苒', role: 'child', avatar: '👧', color: '#8B5CF6' },
   })
   const mom = await db.member.create({
     data: { familyId, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899' },
@@ -43,7 +46,7 @@ export async function POST(req: Request) {
     data: { familyId, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981' },
   })
 
-  // 重新关联 User.memberId（按角色匹配）
+  // 重新关联 User.memberId（按角色匹配，孩子关联第一个孩子）
   await db.user.updateMany({
     where: { familyId, role: 'child' },
     data: { memberId: child.id },
@@ -163,9 +166,18 @@ export async function POST(req: Request) {
     await db.reward.create({ data: { familyId, ...r } })
   }
 
+  // ⑦ 初始目标（给两个孩子各创建一个）
+  const goals = [
+    { title: '暑假学会游泳', description: '学会蛙泳，能游 25 米', status: 'in_progress', memberId: child.id },
+    { title: '每天阅读 30 分钟', description: '坚持每天课外阅读', status: 'not_started', memberId: child2.id },
+  ]
+  for (const g of goals) {
+    await db.goal.create({ data: { familyId, ...g } })
+  }
+
   return ok({
     message: '测试数据已重置',
-    members: { child: child.id, mom: mom.id, dad: dad.id },
+    members: { child: child.id, child2: child2.id, mom: mom.id, dad: dad.id },
     counts: {
       activities: activities.length,
       encouragements: encouragements.length,

@@ -17,7 +17,7 @@ test.describe('流程 19：多家庭数据隔离（v2.0 核心特性）', () => 
     const { resetAndSeed } = await import('./helpers')
     await resetAndSeed()
     const familyA_members = await getMembers()
-    expect(familyA_members.length).toBe(3) // 小宇/妈妈/爸爸
+    expect(familyA_members.length).toBe(4) // 小宇/小苒/妈妈/爸爸
 
     // 家庭 B：用新 code 登录，自动创建新家庭
     await login('family-b-mom')
@@ -40,8 +40,8 @@ test.describe('流程 19：多家庭数据隔离（v2.0 核心特性）', () => 
     const a_child = a_members.find((m) => m.role === 'child')!
     await createGoal({ title: '家庭A的目标', memberId: a_child.id })
     const a_goals = await getGoals()
-    expect(a_goals.length).toBe(1)
-    expect(a_goals[0].title).toBe('家庭A的目标')
+    expect(a_goals.length).toBeGreaterThanOrEqual(1) // seed 的 + 新建的
+    expect(a_goals.find((g) => g.title === '家庭A的目标')).toBeTruthy()
 
     // 家庭 B 登录，不应看到家庭 A 的目标
     await login('family-c-mom')
