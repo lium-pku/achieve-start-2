@@ -149,29 +149,31 @@ export function GoalsTab({ currentMember, members }: Props) {
             </TabsTrigger>
           ))}
         </TabsList>
+      </Tabs>
+      )}
 
-        <TabsContent value={filterMemberId} className="mt-3">
-          {loading ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">加载中...</div>
-          ) : filtered.length === 0 ? (
-            <Card className="p-6 text-center">
-              <div className="text-3xl mb-2">🎯</div>
-              <p className="text-sm text-muted-foreground mb-3">还没有目标</p>
-              {isChild && (
-                <Button size="sm" variant="outline" onClick={handleAdd}>
-                  <Plus className="w-3.5 h-3.5 mr-1" /> 添加第一个目标
-                </Button>
-              )}
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {/* 按状态分组渲染 */}
-              {(['not_started', 'in_progress', 'achieved'] as const).map((status) => {
-                const list = grouped[status]
-                if (list.length === 0) return null
-                const cfg = STATUS_CONFIG[status]
-                return (
-                  <div key={status}>
+      {/* 目标列表（孩子和家长共用） */}
+      {loading ? (
+        <div className="text-center py-8 text-muted-foreground text-sm">加载中...</div>
+      ) : filtered.length === 0 ? (
+        <Card className="p-6 text-center">
+          <div className="text-3xl mb-2">🎯</div>
+          <p className="text-sm text-muted-foreground mb-3">还没有目标</p>
+          {isChild && (
+            <Button size="sm" variant="outline" onClick={handleAdd}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> 添加第一个目标
+            </Button>
+          )}
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {/* 按状态分组渲染 */}
+          {(['not_started', 'in_progress', 'achieved'] as const).map((status) => {
+            const list = grouped[status]
+            if (list.length === 0) return null
+            const cfg = STATUS_CONFIG[status]
+            return (
+              <div key={status}>
                     <div className="flex items-center gap-1.5 mb-2 px-1">
                       <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
                       <span className="text-xs font-medium text-muted-foreground">
@@ -262,9 +264,6 @@ export function GoalsTab({ currentMember, members }: Props) {
               })}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
-      )}
 
       <GoalDialog
         open={dialogOpen}
