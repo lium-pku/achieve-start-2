@@ -53,14 +53,14 @@ test.describe('流程 21：跨家庭越权访问防护（v2.0 安全核心）', 
   })
 
   test('家庭 B 不能 DELETE 家庭 A 的目标', async () => {
-    // 家庭 A 创建目标
-    await login('test-mom')
+    // 家庭 A 孩子创建目标
+    await login('test-child')
     await resetAndSeed()
     const aChild = await findMemberByRole('child')
     const aGoal: any = await createGoal({ title: '家庭A目标', memberId: aChild.id })
 
     // 家庭 B 尝试删除
-    await login('family-z-mom')
+    await login('family-z-child')
     await expect(
       api(`/api/goals/${aGoal.id}`, { method: 'DELETE' })
     ).rejects.toThrow(/不存在|无权|404/)
@@ -153,16 +153,16 @@ test.describe('流程 21：跨家庭越权访问防护（v2.0 安全核心）', 
   })
 
   test('家庭 B 看不到家庭 A 的点评', async () => {
-    // 家庭 A 写点评
-    await login('test-mom')
+    // 家庭 A 孩子写点评
+    await login('test-child')
     await resetAndSeed()
-    const aMom = await findMemberByRole('mom')
+    const aChild = await findMemberByRole('child')
     const { createReview, getReviews } = await import('./helpers')
     await createReview({
       periodType: 'weekly',
       periodStart: '2026-06-23T00:00:00.000Z',
       periodEnd: '2026-06-30T00:00:00.000Z',
-      authorId: aMom.id,
+      authorId: aChild.id,
       content: '家庭A的点评',
     })
 

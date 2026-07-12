@@ -3,9 +3,19 @@ import { db } from '@/lib/db'
 import { ok, fail } from '@/lib/time-utils'
 import { getContext } from '@/lib/auth'
 
+// 角色限制：只有孩子能编辑/删除目标
+function requireChild(ctx: any): Response | null {
+  if (ctx.role !== 'child') {
+    return Response.json({ error: '只有孩子才能管理目标' }, { status: 403 })
+  }
+  return null
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = getContext(req)
+  const err = requireChild(ctx)
+  if (err) return err
 
   const existing = await db.goal.findFirst({
     where: { id, familyId: ctx.familyId },
@@ -30,6 +40,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = getContext(_req)
+  const err = requireChild(ctx)
+  if (err) return err
 
   const existing = await db.goal.findFirst({
     where: { id, familyId: ctx.familyId },

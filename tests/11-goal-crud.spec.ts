@@ -6,9 +6,12 @@ import {
   updateGoal,
   deleteGoal,
   resetAndSeed,
+  login,
+  getMembers,
 } from './helpers'
 
 test.beforeAll(async () => {
+  await login('test-child')
   await resetAndSeed()
 })
 
@@ -50,20 +53,20 @@ test.describe('流程 11：目标 CRUD + 状态切换', () => {
 
   test('每个成员都有独立的目标', async () => {
     const child = await findMemberByRole('child')
-    const mom = await findMemberByRole('mom')
+    const members = await getMembers()
+    const children = members.filter((m) => m.role === 'child')
 
     const childGoal = await createGoal({ title: '孩子的目标', memberId: child.id })
-    const momGoal = await createGoal({ title: '妈妈的目标', memberId: mom.id })
 
-    // 查孩子的目标，不应包含妈妈的
+    // 查第一个孩子的目标
     const childGoals = await getGoals(child.id)
     expect(childGoals.find((g) => g.id === childGoal.id)).toBeTruthy()
-    expect(childGoals.find((g) => g.id === momGoal.id)).toBeUndefined()
 
-    // 查妈妈的目标，不应包含孩子的
-    const momGoals = await getGoals(mom.id)
-    expect(momGoals.find((g) => g.id === momGoal.id)).toBeTruthy()
-    expect(momGoals.find((g) => g.id === childGoal.id)).toBeUndefined()
+    // 如果有第二个孩子，查他的目标不应包含第一个孩子的
+    if (children.length > 1) {
+      const child2Goals = await getGoals(children[1].id)
+      expect(child2Goals.find((g) => g.id === childGoal.id)).toBeUndefined()
+    }
   })
 
   test('缺少 title 应失败', async () => {

@@ -13,7 +13,7 @@ import {
 test.describe('流程 19：多家庭数据隔离（v2.0 核心特性）', () => {
   test('不同家庭的成员互相隔离', async () => {
     // 家庭 A：test-mom（helpers 默认），先 resetAndSeed 清掉测试创建的额外成员
-    await login('test-mom')
+    await login('test-child')
     const { resetAndSeed } = await import('./helpers')
     await resetAndSeed()
     const familyA_members = await getMembers()
@@ -34,7 +34,7 @@ test.describe('流程 19：多家庭数据隔离（v2.0 核心特性）', () => 
 
   test('不同家庭的目标互相隔离', async () => {
     // 家庭 A 创建目标
-    await login('test-mom')
+    await login('test-child')
     await resetAndSeed()
     const a_members = await getMembers()
     const a_child = a_members.find((m) => m.role === 'child')!
@@ -51,7 +51,7 @@ test.describe('流程 19：多家庭数据隔离（v2.0 核心特性）', () => 
 
   test('不同家庭的奖励互相隔离', async () => {
     // 家庭 A
-    await login('test-mom')
+    await login('test-child')
     await resetAndSeed()
     const a_rewards = await getRewards()
     expect(a_rewards.length).toBe(2)

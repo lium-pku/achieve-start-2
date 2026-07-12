@@ -72,6 +72,7 @@ test.describe('流程 22：业务机制补全测试', () => {
   })
 
   test('目标编辑时不能改归属成员', async () => {
+    await login('test-child')
     const child = await findMemberByRole('child')
     const mom = await findMemberByRole('mom')
 
@@ -88,6 +89,7 @@ test.describe('流程 22：业务机制补全测试', () => {
   })
 
   test('missed 状态的活动可以重新打卡', async () => {
+    await login('test-mom')
     const child = await findMemberByRole('child')
     const mom = await findMemberByRole('mom')
 
@@ -98,7 +100,7 @@ test.describe('流程 22：业务机制补全测试', () => {
       scheduledTime: '00:01',
       deadline: '00:02',
       points: 5,
-      createdById: mom.id,
+      createdById: child.id,
       assignedToId: child.id,
     })
 
@@ -121,7 +123,8 @@ test.describe('流程 22：业务机制补全测试', () => {
   })
 
   test('点评历史按时间倒序', async () => {
-    const mom = await findMemberByRole('mom')
+    await login('test-child')
+    const child = await findMemberByRole('child')
     const { createReview, getReviews } = await import('./helpers')
 
     // 写 3 条点评，时间不同
@@ -129,7 +132,7 @@ test.describe('流程 22：业务机制补全测试', () => {
       periodType: 'weekly',
       periodStart: '2026-06-16T00:00:00.000Z',
       periodEnd: '2026-06-23T00:00:00.000Z',
-      authorId: mom.id,
+      authorId: child.id,
       content: '第一周点评',
     })
     await new Promise((r) => setTimeout(r, 100))
@@ -137,7 +140,7 @@ test.describe('流程 22：业务机制补全测试', () => {
       periodType: 'weekly',
       periodStart: '2026-06-23T00:00:00.000Z',
       periodEnd: '2026-06-30T00:00:00.000Z',
-      authorId: mom.id,
+      authorId: child.id,
       content: '第二周点评',
     })
     await new Promise((r) => setTimeout(r, 100))
@@ -145,7 +148,7 @@ test.describe('流程 22：业务机制补全测试', () => {
       periodType: 'weekly',
       periodStart: '2026-06-30T00:00:00.000Z',
       periodEnd: '2026-07-07T00:00:00.000Z',
-      authorId: mom.id,
+      authorId: child.id,
       content: '第三周点评',
     })
 
@@ -164,6 +167,7 @@ test.describe('流程 22：业务机制补全测试', () => {
 
   test('积分流水包含多种类型（earn/bonus/penalty/redeem/adjust）', async () => {
     // 单独重置避免数据污染
+    await login('test-mom')
     const { resetAndSeed } = await import('./helpers')
     await resetAndSeed()
 
