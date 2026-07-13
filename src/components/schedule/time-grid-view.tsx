@@ -28,6 +28,8 @@ interface Props {
   members?: any[]
   selectedMemberId?: string
   onSelectedMemberChange?: (id: string) => void
+  selectedDate: Date
+  onSelectedDateChange: (d: Date) => void
   onReload: () => void
   onActivityClick: (a: Activity) => void
   onActivityEdit?: (a: Activity) => void
@@ -159,6 +161,8 @@ export function TimeGridView({
   members,
   selectedMemberId,
   onSelectedMemberChange,
+  selectedDate,
+  onSelectedDateChange,
   onReload,
   onActivityClick,
 }: Props) {
@@ -167,7 +171,12 @@ export function TimeGridView({
   const [saving, setSaving] = useState<string | null>(null)
   const [hoverTime, setHoverTime] = useState<{ id: string; start: string; end: string } | null>(null)
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
-  const [selectedDate, setSelectedDate] = useState(new Date())
+
+  // 滑动相关状态
+  const SWIPE_THRESHOLD = 50 // 滑动超过 50px 才触发日期切换
+  const swipeStartRef = useRef<{ x: number; y: number; t: number } | null>(null)
+  const [swipeOffset, setSwipeOffset] = useState(0) // 滑动过程中的偏移量（px），用于动画反馈
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null) // 触发切换后的动画方向
 
   const pxToMin = useCallback((px: number) => (px / HOUR_PX) * 60, [])
   const dragStateRef = useRef<DragState | null>(null)
@@ -344,14 +353,78 @@ export function TimeGridView({
   const goPrevDay = () => {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() - 1)
-    setSelectedDate(d)
+    onSelectedDateChange(d)
   }
   const goNextDay = () => {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + 1)
-    setSelectedDate(d)
+    onSelectedDateChange(d)
   }
-  const goToday = () => setSelectedDate(new Date())
+  const goToday = () => onSelectedDateChange(new Date())
+
+  // === 滑动切换日期 ===
+  // 同时支持 touch 和 mouse（pointer events），以便移动端滑动 + 桌面拖拽都能触发
+  const handleSwipePointerDown = (e: React.PointerEvent) => {
+    // 如果是家长正在拖动活动条，不启动滑动
+    if (dragStateRef.current) return
+    // 只响应主按键（左键 / touch / pen）
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    swipeStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }
+    setSwipeOffset(0)
+    setSwipeDirection(null)
+  }
+
+  const handleSwipePointerMove = (e: React.PointerEvent) => {
+    const start = swipeStartRef.current
+    if (!start) return
+    // 如果家长正在拖动活动条（已经真正开始移动），取消滑动
+    if (dragStateRef.current?.moved) {
+      swipeStartRef.current = null
+      setSwipeOffset(0)
+      return
+    }
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+    // 水平滑动占主导时才跟踪偏移
+    if (Math.abs(dx) > Math.abs(dy)) {
+      setSwipeOffset(dx)
+    } else {
+      // 垂直滑动时取消偏移（让页面正常滚动）
+      setSwipeOffset(0)
+    }
+  }
+
+  const handleSwipePointerUp = (e: React.PointerEvent) => {
+    const start = swipeStartRef.current
+    swipeStartRef.current = null
+    if (!start) return
+    // 如果家长刚刚拖动了活动条，不触发滑动
+    if (dragStateRef.current?.moved || justDraggedRef.current) {
+      setSwipeOffset(0)
+      return
+    }
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+    // 判断是否为有效水平滑动
+    if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) {
+        // 向左滑 → 下一天
+        setSwipeDirection('left')
+        setSwipeOffset(0)
+        goNextDay()
+      } else {
+        // 向右滑 → 前一天
+        setSwipeDirection('right')
+        setSwipeOffset(0)
+        goPrevDay()
+      }
+    } else {
+      // 未达到阈值，回弹
+      setSwipeOffset(0)
+    }
+    // 清除动画方向类（等动画结束后）
+    setTimeout(() => setSwipeDirection(null), 300)
+  }
 
   return (
     <div className="space-y-3">
@@ -433,11 +506,24 @@ export function TimeGridView({
       </Card>
 
       {viewMode === 'day' ? (
-        /* 日视图 */
-        activities.length === 0 ? (
+        /* 日视图 - 支持左右滑动切换日期 */
+        <div
+          className="schedule-day-view"
+          onPointerDown={handleSwipePointerDown}
+          onPointerMove={handleSwipePointerMove}
+          onPointerUp={handleSwipePointerUp}
+          onPointerCancel={handleSwipePointerUp}
+          style={{
+            transform: swipeOffset !== 0 ? `translateX(${swipeOffset * 0.3}px)` : 'none',
+            transition: swipeOffset === 0 ? 'transform 0.3s ease' : 'none',
+            touchAction: 'pan-y',
+          }}
+        >
+          {activities.length === 0 ? (
           <Card className="p-6 text-center">
             <div className="text-3xl mb-2">📭</div>
             <p className="text-sm text-muted-foreground">当天没有安排活动</p>
+            <p className="text-[10px] text-muted-foreground mt-1">← 左右滑动查看其他日期 →</p>
           </Card>
         ) : (
           <Card className="p-3 overflow-hidden">
@@ -474,7 +560,8 @@ export function TimeGridView({
               </div>
             </div>
           </Card>
-        )
+        )}
+        </div>
       ) : (
         /* 周视图：7 行紧凑俯览 */
         <Card className="p-2 space-y-1">

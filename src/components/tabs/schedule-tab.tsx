@@ -53,6 +53,8 @@ export function ScheduleTab({ currentMember, members }: Props) {
   const [detailOpen, setDetailOpen] = useState(false)
   // 家长视角下选择的成员（看谁的活动）
   const [selectedMemberId, setSelectedMemberId] = useState<string>('')
+  // 网格视图选中的日期（提升到此层，便于切换日期时重新拉数据）
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
 
   const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
   const children = members.filter((m) => m.role === 'child')
@@ -67,7 +69,12 @@ export function ScheduleTab({ currentMember, members }: Props) {
     }
   }, [scheduleType])
 
-  // 加载网格视图数据（选中成员的今日活动 + 完成日志）
+  // 格式化日期为 YYYY-MM-DD
+  const formatDateStr = (d: Date) => {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  // 加载网格视图数据（选中成员的指定日期活动 + 完成日志）
   const loadGrid = useCallback(async () => {
     try {
       const isChild = currentMember.role === 'child'
@@ -80,17 +87,22 @@ export function ScheduleTab({ currentMember, members }: Props) {
         setTodayLogs({})
         return
       }
-      const url = `/api/activities?today=1&assignedToId=${targetMemberId}`
-      const todayActs = await api<Activity[]>(url)
-      setAllActivities(todayActs)
+      // 用 date 参数拉取指定日期的活动（支持左右滑动切换日期）
+      const dateStr = formatDateStr(selectedDate)
+      const url = `/api/activities?date=${dateStr}&assignedToId=${targetMemberId}`
+      const dayActs = await api<Activity[]>(url)
+      setAllActivities(dayActs)
 
-      const today = new Date()
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      // 构建选中日期的 log map
+      const targetStr = dateStr
       const logMap: Record<string, any> = {}
       try {
-        const logs = await api<any[]>(`/api/activities/logs?memberId=${targetMemberId}&days=3`)
+        // 多拉几天日志，支持向前翻页查看历史
+        const now = new Date()
+        const diffDays = Math.max(7, Math.ceil((now.getTime() - selectedDate.getTime()) / (1000 * 60 * 60 * 24)))
+        const logs = await api<any[]>(`/api/activities/logs?memberId=${targetMemberId}&days=${diffDays + 7}`)
         for (const log of logs) {
-          if (log.occurrenceDate?.startsWith(todayStr)) {
+          if (log.occurrenceDate?.startsWith(targetStr)) {
             logMap[log.activityId] = log
           }
         }
@@ -101,7 +113,7 @@ export function ScheduleTab({ currentMember, members }: Props) {
     } catch (e) {
       console.error(e)
     }
-  }, [currentMember.id, currentMember.role, selectedMemberId, members])
+  }, [currentMember.id, currentMember.role, selectedMemberId, members, selectedDate])
 
   // 初始化 selectedMemberId（家长视角默认第一个孩子）
   useEffect(() => {
@@ -333,6 +345,8 @@ export function ScheduleTab({ currentMember, members }: Props) {
               members={children}
               selectedMemberId={selectedMemberId}
               onSelectedMemberChange={setSelectedMemberId}
+              selectedDate={selectedDate}
+              onSelectedDateChange={setSelectedDate}
               onReload={handleReload}
               onActivityClick={handleActivityClick}
               onActivityEdit={handleEdit}
