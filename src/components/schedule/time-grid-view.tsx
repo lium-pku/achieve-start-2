@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   SCHEDULE_LABEL,
@@ -22,8 +22,13 @@ import {
 import { toast } from 'sonner'
 
 interface Props {
+  dataDate?: Date
+  prevActivities: Activity[]
   activities: Activity[]
+  nextActivities: Activity[]
+  prevLogs: Record<string, any>
   todayLogs: Record<string, any>
+  nextLogs: Record<string, any>
   currentMember: any
   members?: any[]
   selectedMemberId?: string
@@ -155,8 +160,13 @@ function getWeekDays(date: Date): Date[] {
 }
 
 export function TimeGridView({
+  dataDate,
+  prevActivities,
   activities,
+  nextActivities,
+  prevLogs,
   todayLogs,
+  nextLogs,
   currentMember,
   members,
   selectedMemberId,
@@ -168,15 +178,44 @@ export function TimeGridView({
 }: Props) {
   const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
   const containerRef = useRef<HTMLDivElement>(null)
+  const carouselRef = useRef<HTMLDivElement>(null)
   const [saving, setSaving] = useState<string | null>(null)
   const [hoverTime, setHoverTime] = useState<{ id: string; start: string; end: string } | null>(null)
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day')
 
-  // 滑动相关状态
+  // === 轮播滑动状态 ===
   const SWIPE_THRESHOLD = 50 // 滑动超过 50px 才触发日期切换
   const swipeStartRef = useRef<{ x: number; y: number; t: number } | null>(null)
-  const [swipeOffset, setSwipeOffset] = useState(0) // 滑动过程中的偏移量（px），用于动画反馈
-  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null) // 触发切换后的动画方向
+  const [swipeOffset, setSwipeOffset] = useState(0) // 当前偏移量（px）
+  const [animating, setAnimating] = useState(false) // 是否在动画过渡中
+  const [panelWidth, setPanelWidth] = useState(0) // 轮播面板宽度，用于 snap 动画
+
+  // 测量轮播面板宽度（首次 mount + 窗口 resize 时）
+  useEffect(() => {
+    if (!carouselRef.current) return
+    const measure = () => {
+      if (carouselRef.current) {
+        setPanelWidth(carouselRef.current.offsetWidth)
+      }
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
+  // 数据到达后重置 swipeOffset（配合轮播动画：新 current 面板从相邻位置 snap 到中央）
+  // dataDate === selectedDate 表示父组件已经为新选中日期加载完了数据
+  useEffect(() => {
+    if (
+      dataDate &&
+      dataDate.getTime() === selectedDate.getTime() &&
+      swipeOffset !== 0 &&
+      !animating
+    ) {
+      // 新数据已到，无动画地重置偏移量（此时中间面板已经是新 current，用户看到的是同一部分）
+      setSwipeOffset(0)
+    }
+  }, [dataDate, selectedDate, swipeOffset, animating])
 
   const pxToMin = useCallback((px: number) => (px / HOUR_PX) * 60, [])
   const dragStateRef = useRef<DragState | null>(null)
@@ -260,7 +299,7 @@ export function TimeGridView({
     onActivityClick(a)
   }
 
-  // 日视图：过滤当天活动
+  // 日视图：过滤当天活动（current 面板用）
   const dayActivities = useMemo(() => {
     return activities.filter((a) => {
       // 网格视图显示选中天所有活动（不区分周期类型）
@@ -268,31 +307,19 @@ export function TimeGridView({
     })
   }, [activities])
 
-  const { start: rangeStart, end: rangeEnd } = useMemo(() => getTimeRange(dayActivities), [dayActivities])
-  const totalMin = rangeEnd - rangeStart
-  const totalHeight = (totalMin / 60) * HOUR_PX
-
-  const hours = useMemo(() => {
-    const arr: number[] = []
-    for (let h = Math.floor(rangeStart / 60); h <= Math.ceil(rangeEnd / 60); h++) {
-      if (h * 60 >= rangeStart && h * 60 <= rangeEnd) arr.push(h)
-    }
-    return arr
-  }, [rangeStart, rangeEnd])
-
-  const groups = useMemo(() => groupOverlapping(dayActivities), [dayActivities])
   const untimedActivities = useMemo(() => activities.filter((a) => !a.scheduledTime), [activities])
 
-  const renderBar = (a: Activity, laneCount: number) => {
+  // 渲染单个活动条（接收 logs 和 rangeStart 参数，用于在轮播的 3 个面板中复用）
+  const renderBar = (a: Activity, laneCount: number, panelLogs: Record<string, any>, panelRangeStart: number) => {
     const s = timeToMin(a.scheduledTime)!
     const e = timeToMin(a.deadline) ?? s + 60
-    const top = ((s - rangeStart) / 60) * HOUR_PX
+    const top = ((s - panelRangeStart) / 60) * HOUR_PX
     const height = Math.max(MIN_BAR_HEIGHT, ((e - s) / 60) * HOUR_PX - 2)
     const lane = (a as any)._lane || 0
     const barWidthPercent = 100 / laneCount
     const barLeftPercent = lane * barWidthPercent
 
-    const log = todayLogs[a.id]
+    const log = panelLogs[a.id]
     const status = log?.status || 'pending'
     const now = new Date()
     const nowMin = now.getHours() * 60 + now.getMinutes()
@@ -346,6 +373,68 @@ export function TimeGridView({
     )
   }
 
+  // 渲染单个日视图面板（prev / current / next 共用）
+  // panelActivities: 该天的活动；panelLogs: 该天的打卡日志；panelDate: 该天日期；isCurrent: 是否是当前选中天（影响拖拽权限）
+  const renderDayPanel = (panelActivities: Activity[], panelLogs: Record<string, any>, panelDate: Date, isCurrent: boolean) => {
+    if (panelActivities.length === 0) {
+      return (
+        <Card className="p-6 text-center">
+          <div className="text-3xl mb-2">📭</div>
+          <p className="text-sm text-muted-foreground">当天没有安排活动</p>
+          <p className="text-[10px] text-muted-foreground mt-1">← 左右滑动查看其他日期 →</p>
+        </Card>
+      )
+    }
+
+    const { start: panelRangeStart, end: panelRangeEnd } = getTimeRange(panelActivities)
+    const panelTotalMin = panelRangeEnd - panelRangeStart
+    const panelTotalHeight = (panelTotalMin / 60) * HOUR_PX
+
+    const panelHours: number[] = []
+    for (let h = Math.floor(panelRangeStart / 60); h <= Math.ceil(panelRangeEnd / 60); h++) {
+      if (h * 60 >= panelRangeStart && h * 60 <= panelRangeEnd) panelHours.push(h)
+    }
+
+    const panelGroups = groupOverlapping(panelActivities)
+
+    return (
+      <Card className="p-3 overflow-hidden">
+        <div className="relative flex" style={{ minHeight: panelTotalHeight }}>
+          <div className="relative shrink-0 border-r border-border bg-muted/30" style={{ width: TIME_LABEL_WIDTH, minHeight: panelTotalHeight }}>
+            {panelHours.map((h) => (
+              <div key={h} className="absolute left-0 right-0 text-[10px] text-muted-foreground tabular-nums" style={{ top: ((h * 60 - panelRangeStart) / 60) * HOUR_PX - 6 }}>
+                <div className="px-1 text-right pr-2 font-medium">{String(h).padStart(2, '0')}:00</div>
+              </div>
+            ))}
+          </div>
+          <div className="relative flex-1" style={{ minHeight: panelTotalHeight }}>
+            {panelHours.map((h) => (
+              <div key={h} className="absolute left-0 right-0 border-t border-border/40" style={{ top: ((h * 60 - panelRangeStart) / 60) * HOUR_PX }} />
+            ))}
+            {(() => {
+              const nowMin = today.getHours() * 60 + today.getMinutes()
+              if (nowMin < panelRangeStart || nowMin > panelRangeEnd || !isSameDay(panelDate, today)) return null
+              const top = ((nowMin - panelRangeStart) / 60) * HOUR_PX
+              return (
+                <div className="absolute left-0 right-0 border-t-2 border-red-500 z-10 pointer-events-none" style={{ top }}>
+                  <div className="absolute -left-1 -top-1.5 w-3 h-3 rounded-full bg-red-500" />
+                  <div className="absolute right-1 -top-4 text-[9px] text-red-600 font-medium bg-background/80 px-1 rounded">
+                    现在 {String(today.getHours()).padStart(2, '0')}:{String(today.getMinutes()).padStart(2, '0')}
+                  </div>
+                </div>
+              )
+            })()}
+            {panelGroups.map((group, gi) => (
+              <div key={gi} className="absolute inset-0 pointer-events-none">
+                {group.activities.map((a) => renderBar(a, group.laneCount, panelLogs, panelRangeStart))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   // 周视图渲染
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate])
   const today = new Date()
@@ -367,11 +456,13 @@ export function TimeGridView({
   const handleSwipePointerDown = (e: React.PointerEvent) => {
     // 如果是家长正在拖动活动条，不启动滑动
     if (dragStateRef.current) return
+    // 动画过渡中不响应新的滑动
+    if (animating) return
     // 只响应主按键（左键 / touch / pen）
     if (e.button !== 0 && e.pointerType === 'mouse') return
     swipeStartRef.current = { x: e.clientX, y: e.clientY, t: Date.now() }
     setSwipeOffset(0)
-    setSwipeDirection(null)
+    setAnimating(false)
   }
 
   const handleSwipePointerMove = (e: React.PointerEvent) => {
@@ -385,9 +476,9 @@ export function TimeGridView({
     }
     const dx = e.clientX - start.x
     const dy = e.clientY - start.y
-    // 水平滑动占主导时才跟踪偏移
+    // 水平滑动占主导时才跟踪偏移（阻尼 0.6 让滑动跟手但不凶猛）
     if (Math.abs(dx) > Math.abs(dy)) {
-      setSwipeOffset(dx)
+      setSwipeOffset(dx * 0.6)
     } else {
       // 垂直滑动时取消偏移（让页面正常滚动）
       setSwipeOffset(0)
@@ -405,25 +496,27 @@ export function TimeGridView({
     }
     const dx = e.clientX - start.x
     const dy = e.clientY - start.y
-    // 判断是否为有效水平滑动
+    // 判断是否为有效水平滑动（原始 dx 超过阈值，不是阻尼后的 swipeOffset）
     if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) {
-        // 向左滑 → 下一天
-        setSwipeDirection('left')
-        setSwipeOffset(0)
-        goNextDay()
-      } else {
-        // 向右滑 → 前一天
-        setSwipeDirection('right')
-        setSwipeOffset(0)
-        goPrevDay()
-      }
+      // snap 到相邻 panel
+      setAnimating(true)
+      const targetOffset = dx > 0 ? panelWidth : -panelWidth
+      setSwipeOffset(targetOffset)
+      // 动画结束后调 onSelectedDateChange（父重新拉数据）
+      // 不立即重置 swipeOffset，等新数据到达后由 useEffect 重置
+      setTimeout(() => {
+        const newDate = new Date(selectedDate)
+        newDate.setDate(newDate.getDate() + (dx > 0 ? -1 : 1))
+        onSelectedDateChange(newDate)
+        // 注意：不在这里重置 swipeOffset，等 dataDate === selectedDate 后由 useEffect 重置
+        setAnimating(false)
+      }, 300)
     } else {
-      // 未达到阈值，回弹
+      // 未达到阈值，回弹到中央
+      setAnimating(true)
       setSwipeOffset(0)
+      setTimeout(() => setAnimating(false), 300)
     }
-    // 清除动画方向类（等动画结束后）
-    setTimeout(() => setSwipeDirection(null), 300)
   }
 
   return (
@@ -470,7 +563,7 @@ export function TimeGridView({
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={viewMode === 'day' ? goPrevDay : () => {
           const d = new Date(selectedDate)
           d.setDate(d.getDate() - 7)
-          setSelectedDate(d)
+          onSelectedDateChange(d)
         }}>
           <ChevronLeft className="w-4 h-4" />
         </Button>
@@ -491,7 +584,7 @@ export function TimeGridView({
         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={viewMode === 'day' ? goNextDay : () => {
           const d = new Date(selectedDate)
           d.setDate(d.getDate() + 7)
-          setSelectedDate(d)
+          onSelectedDateChange(d)
         }}>
           <ChevronRight className="w-4 h-4" />
         </Button>
@@ -506,61 +599,44 @@ export function TimeGridView({
       </Card>
 
       {viewMode === 'day' ? (
-        /* 日视图 - 支持左右滑动切换日期 */
+        /* 日视图 - 3-panel 轮播，预加载前后天，滑动过程可见相邻日期内容 */
         <div
-          className="schedule-day-view"
+          ref={carouselRef}
+          className="schedule-day-view overflow-hidden"
           onPointerDown={handleSwipePointerDown}
           onPointerMove={handleSwipePointerMove}
           onPointerUp={handleSwipePointerUp}
           onPointerCancel={handleSwipePointerUp}
           style={{
-            transform: swipeOffset !== 0 ? `translateX(${swipeOffset * 0.3}px)` : 'none',
-            transition: swipeOffset === 0 ? 'transform 0.3s ease' : 'none',
             touchAction: 'pan-y',
           }}
         >
-          {activities.length === 0 ? (
-          <Card className="p-6 text-center">
-            <div className="text-3xl mb-2">📭</div>
-            <p className="text-sm text-muted-foreground">当天没有安排活动</p>
-            <p className="text-[10px] text-muted-foreground mt-1">← 左右滑动查看其他日期 →</p>
-          </Card>
-        ) : (
-          <Card className="p-3 overflow-hidden">
-            <div className="relative flex" style={{ minHeight: totalHeight }}>
-              <div className="relative shrink-0 border-r border-border bg-muted/30" style={{ width: TIME_LABEL_WIDTH, minHeight: totalHeight }}>
-                {hours.map((h) => (
-                  <div key={h} className="absolute left-0 right-0 text-[10px] text-muted-foreground tabular-nums" style={{ top: ((h * 60 - rangeStart) / 60) * HOUR_PX - 6 }}>
-                    <div className="px-1 text-right pr-2 font-medium">{String(h).padStart(2, '0')}:00</div>
-                  </div>
-                ))}
-              </div>
-              <div className="relative flex-1" style={{ minHeight: totalHeight }}>
-                {hours.map((h) => (
-                  <div key={h} className="absolute left-0 right-0 border-t border-border/40" style={{ top: ((h * 60 - rangeStart) / 60) * HOUR_PX }} />
-                ))}
-                {(() => {
-                  const nowMin = today.getHours() * 60 + today.getMinutes()
-                  if (nowMin < rangeStart || nowMin > rangeEnd || !isSameDay(selectedDate, today)) return null
-                  const top = ((nowMin - rangeStart) / 60) * HOUR_PX
-                  return (
-                    <div className="absolute left-0 right-0 border-t-2 border-red-500 z-10 pointer-events-none" style={{ top }}>
-                      <div className="absolute -left-1 -top-1.5 w-3 h-3 rounded-full bg-red-500" />
-                      <div className="absolute right-1 -top-4 text-[9px] text-red-600 font-medium bg-background/80 px-1 rounded">
-                        现在 {String(today.getHours()).padStart(2, '0')}:{String(today.getMinutes()).padStart(2, '0')}
-                      </div>
-                    </div>
-                  )
-                })()}
-                {groups.map((group, gi) => (
-                  <div key={gi} className="absolute inset-0 pointer-events-none">
-                    {group.activities.map((a) => renderBar(a, group.laneCount))}
-                  </div>
-                ))}
-              </div>
+          <div
+            className="schedule-day-carousel-track flex"
+            style={{
+              width: '300%',
+              transform: `translateX(calc(-33.333% + ${swipeOffset}px))`,
+              transition: animating ? 'transform 0.3s ease' : 'none',
+            }}
+          >
+            <div className="schedule-day-panel" style={{ width: '33.333%' }}>
+              {(() => {
+                const prevDate = new Date(selectedDate)
+                prevDate.setDate(prevDate.getDate() - 1)
+                return renderDayPanel(prevActivities, prevLogs, prevDate, false)
+              })()}
             </div>
-          </Card>
-        )}
+            <div className="schedule-day-panel" style={{ width: '33.333%' }}>
+              {renderDayPanel(activities, todayLogs, selectedDate, true)}
+            </div>
+            <div className="schedule-day-panel" style={{ width: '33.333%' }}>
+              {(() => {
+                const nextDate = new Date(selectedDate)
+                nextDate.setDate(nextDate.getDate() + 1)
+                return renderDayPanel(nextActivities, nextLogs, nextDate, false)
+              })()}
+            </div>
+          </div>
         </div>
       ) : (
         /* 周视图：7 行紧凑俯览 */

@@ -40,9 +40,7 @@ interface Props {
 type ViewMode = 'list' | 'grid'
 
 export function ScheduleTab({ currentMember, members }: Props) {
-  const [allActivities, setAllActivities] = useState<Activity[]>([])
   const [listActivities, setListActivities] = useState<Activity[]>([])
-  const [todayLogs, setTodayLogs] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
@@ -53,8 +51,16 @@ export function ScheduleTab({ currentMember, members }: Props) {
   const [detailOpen, setDetailOpen] = useState(false)
   // 家长视角下选择的成员（看谁的活动）
   const [selectedMemberId, setSelectedMemberId] = useState<string>('')
-  // 网格视图选中的日期（提升到此层，便于切换日期时重新拉数据）
+  // 网格视图选中的日期
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
+  // 预加载 3 天数据（前一天/今天/后一天），用于轮播滑动
+  // dataDate 表示这份数据是哪个日期的，避免轮播切换时拿到旧数据出现闪烁
+  const [dayData, setDayData] = useState<{
+    date: Date
+    prev: { activities: Activity[]; logs: Record<string, any> }
+    current: { activities: Activity[]; logs: Record<string, any> }
+    next: { activities: Activity[]; logs: Record<string, any> }
+  } | null>(null)
 
   const isParent = currentMember.role === 'mom' || currentMember.role === 'dad'
   const children = members.filter((m) => m.role === 'child')
@@ -74,7 +80,24 @@ export function ScheduleTab({ currentMember, members }: Props) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   }
 
-  // 加载网格视图数据（选中成员的指定日期活动 + 完成日志）
+  // 拉取某一天的活动 + 该天的打卡日志
+  const fetchDayData = async (date: Date, targetMemberId: string) => {
+    const dateStr = formatDateStr(date)
+    const acts = await api<Activity[]>(`/api/activities?date=${dateStr}&assignedToId=${targetMemberId}`)
+    // 多拉几天日志，支持向前翻页查看历史
+    const now = new Date()
+    const diffDays = Math.max(7, Math.ceil((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)))
+    const logs = await api<any[]>(`/api/activities/logs?memberId=${targetMemberId}&days=${diffDays + 7}`)
+    const logMap: Record<string, any> = {}
+    for (const log of logs) {
+      if (log.occurrenceDate?.startsWith(dateStr)) {
+        logMap[log.activityId] = log
+      }
+    }
+    return { activities: acts, logs: logMap }
+  }
+
+  // 加载网格视图数据（前一天/选中天/后一天 并行拉取，用于轮播预加载）
   const loadGrid = useCallback(async () => {
     try {
       const isChild = currentMember.role === 'child'
@@ -83,33 +106,22 @@ export function ScheduleTab({ currentMember, members }: Props) {
         ? currentMember.id
         : selectedMemberId || childList[0]?.id || ''
       if (!targetMemberId) {
-        setAllActivities([])
-        setTodayLogs({})
+        setDayData(null)
         return
       }
-      // 用 date 参数拉取指定日期的活动（支持左右滑动切换日期）
-      const dateStr = formatDateStr(selectedDate)
-      const url = `/api/activities?date=${dateStr}&assignedToId=${targetMemberId}`
-      const dayActs = await api<Activity[]>(url)
-      setAllActivities(dayActs)
+      const prevDate = new Date(selectedDate)
+      prevDate.setDate(prevDate.getDate() - 1)
+      const nextDate = new Date(selectedDate)
+      nextDate.setDate(nextDate.getDate() + 1)
 
-      // 构建选中日期的 log map
-      const targetStr = dateStr
-      const logMap: Record<string, any> = {}
-      try {
-        // 多拉几天日志，支持向前翻页查看历史
-        const now = new Date()
-        const diffDays = Math.max(7, Math.ceil((now.getTime() - selectedDate.getTime()) / (1000 * 60 * 60 * 24)))
-        const logs = await api<any[]>(`/api/activities/logs?memberId=${targetMemberId}&days=${diffDays + 7}`)
-        for (const log of logs) {
-          if (log.occurrenceDate?.startsWith(targetStr)) {
-            logMap[log.activityId] = log
-          }
-        }
-      } catch (e) {
-        // 忽略
-      }
-      setTodayLogs(logMap)
+      // 三个日期并行拉取，提升加载速度
+      const [prev, current, next] = await Promise.all([
+        fetchDayData(prevDate, targetMemberId),
+        fetchDayData(selectedDate, targetMemberId),
+        fetchDayData(nextDate, targetMemberId),
+      ])
+
+      setDayData({ date: selectedDate, prev, current, next })
     } catch (e) {
       console.error(e)
     }
@@ -339,8 +351,13 @@ export function ScheduleTab({ currentMember, members }: Props) {
             <div className="text-center py-8 text-muted-foreground text-sm">加载中...</div>
           ) : (
             <TimeGridView
-              activities={allActivities}
-              todayLogs={todayLogs}
+              dataDate={dayData?.date}
+              prevActivities={dayData?.prev.activities || []}
+              activities={dayData?.current.activities || []}
+              nextActivities={dayData?.next.activities || []}
+              prevLogs={dayData?.prev.logs || {}}
+              todayLogs={dayData?.current.logs || {}}
+              nextLogs={dayData?.next.logs || {}}
               currentMember={currentMember}
               members={children}
               selectedMemberId={selectedMemberId}

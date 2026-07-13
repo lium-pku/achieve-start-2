@@ -66,3 +66,38 @@ Stage Summary:
 - 日期切换后活动列表自动刷新（之前切换日期不刷新数据是个隐藏 bug）
 - 家长拖动活动条与滑动不冲突
 - 新增 8 个 UI 测试覆盖滑动功能
+
+---
+Task ID: CAROUSEL-PRELOAD-1
+Agent: main
+Task: 日视图轮播改造 + 预加载前后天，让滑动过程能直接看到相邻日期内容
+
+Work Log:
+- 之前的实现：滑动只是当前面板的 translateX 反馈，相邻日期内容不存在，滑动看不到"前一天/后一天"
+- 改为 3-panel 轮播结构：prev / current / next 三个面板横向排列，track 宽度 300%，translateX(-33.333%) 默认显示中间
+- schedule-tab.tsx 改造：
+  - 用 dayData state 替换 allActivities + todayLogs，包含 prev/current/next 三天的 activities + logs
+  - fetchDayData helper 拉单天数据
+  - loadGrid 用 Promise.all 并行拉 3 天，提升加载速度
+  - dayData.date 字段记录数据属于哪个日期，用于轮播无闪烁切换
+- time-grid-view.tsx 改造：
+  - 提取 renderDayPanel(panelActivities, panelLogs, panelDate, isCurrent) 函数，3 个面板共用
+  - renderBar 接收 panelLogs + panelRangeStart 参数，避免硬依赖外部变量
+  - 轮播容器 .schedule-day-view > .schedule-day-carousel-track > .schedule-day-panel * 3
+  - 滑动时 translateX 跟手（阻尼 0.6），松手后 snap 到 ±panelWidth
+  - 关键防闪烁：snap 后不立即重置 swipeOffset，等父组件新数据到达（dataDate === selectedDate）后再重置
+  - animating 状态控制 transition 启用，防止跟手时有延迟
+  - 测量 panelWidth（carouselRef.offsetWidth）+ resize 监听
+- 修复编译错误：
+  - useEffect 未导入
+  - 周视图导航误用 setSelectedDate（应改为 onSelectedDateChange，因为 selectedDate 现在是受控 prop）
+- 新增 3 个测试：
+  - 轮播结构：3 个 .schedule-day-panel 子元素存在
+  - 预加载：滑动过程中不出现"加载中..."（证明数据已预加载）
+  - 连续滑动：今天 → 明天 → 后天，每次滑动都能成功切换
+- 全部 11 个 swipe 测试 + 11 个 schedule 测试 + 6 个 API 测试通过
+
+Stage Summary:
+- 日视图现在是真正的 3-panel 轮播，滑动过程能看到相邻日期的真实内容（不是空白或 loading）
+- 预加载让滑动体验流畅，无闪烁
+- snap 动画 + dataDate 同步机制保证切换日期时无内容跳变
