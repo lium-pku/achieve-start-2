@@ -658,8 +658,8 @@ export function TimeGridView({
                 return a.dayOfWeek === td
               }
               if (a.scheduleType === 'monthly') return a.dayOfMonth === target.getDate()
-              if (a.scheduleType === 'once' && a.specificDate) {
-                const spec = new Date(a.specificDate)
+              if (a.scheduleType === 'once' && (a as any).specificDate) {
+                const spec = new Date((a as any).specificDate)
                 spec.setHours(0, 0, 0, 0)
                 return spec.getTime() === target.getTime()
               }
@@ -668,7 +668,7 @@ export function TimeGridView({
             return (
               <button
                 key={idx}
-                onClick={() => { setSelectedDate(day); setViewMode('day') }}
+                onClick={() => { onSelectedDateChange(day); setViewMode('day') }}
                 className={`w-full flex items-center gap-2 p-2 rounded-lg border text-left transition-colors ${
                   isSelected ? 'border-primary bg-primary/5' : isToday ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted/40'
                 }`}

@@ -52,12 +52,13 @@ test.describe('UI 38：规划 Tab 子页面切换', () => {
     ).toBeVisible({ timeout: 5000 })
   })
 
-  test('孩子视角：只看到自己的目标，不显示"新建目标"按钮', async ({ page }) => {
+  test('孩子视角：只看到自己的目标，显示"新建目标"按钮', async ({ page }) => {
     await switchMemberByUI(page, '小宇')
     await gotoTab(page, 'planning')
     await expect(page.getByText('规划').first()).toBeVisible({ timeout: 5000 })
-    // 孩子不能新建目标
-    await expect(page.getByRole('button', { name: /新建目标/ })).toHaveCount(0)
+    // 孩子可以新建自己的目标（isChild && 显示按钮）
+    await page.waitForTimeout(500)
+    await expect(page.getByRole('button', { name: /新建目标/ })).toBeVisible({ timeout: 5000 })
   })
 
   test('目标卡片显示状态徽章（未开始/进行中/已达成）', async ({ page }) => {

@@ -386,7 +386,7 @@ export function ScheduleTab({ currentMember, members }: Props) {
         open={detailOpen}
         onOpenChange={setDetailOpen}
         activity={detailActivity}
-        log={detailActivity ? todayLogs[detailActivity.id] : undefined}
+        log={detailActivity ? (dayData?.current.logs || {})[detailActivity.id] : undefined}
         currentMember={currentMember}
         onEdit={handleEdit}
       />
