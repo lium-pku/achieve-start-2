@@ -1,5 +1,33 @@
 # 开发规则
 
+## Git Hooks 强制执行（自动安装）
+
+本项目通过 git hooks 自动强制执行以下规则，无需人工记忆：
+
+### 安装方式
+```bash
+bash scripts/setup-hooks.sh   # 首次 clone 或更新 hooks 后执行
+```
+
+### 钩子行为
+
+| 钩子 | 触发时机 | 检查内容 | 失败后果 |
+|------|----------|----------|----------|
+| **pre-commit** | `git commit` | ① `tsc --noEmit` 类型检查 ② `eslint` 代码规范 ③ 改 src/ 是否同步更新 docs/ ④ 改 src/ 是否同步更新 tests/ | 阻止提交（①②强制，③④警告） |
+| **commit-msg** | `git commit` | ① 禁止 UUID 格式 message ② 至少 10 字符 ③ 推荐 Conventional Commits 格式 | 阻止提交 |
+| **pre-push** | `git push` | 全量 `npx playwright test`（~5-8 分钟） | 阻止推送 |
+
+### 紧急跳过方式（不推荐）
+```bash
+git commit --no-verify        # 跳过 pre-commit + commit-msg
+git push --no-verify          # 跳过 pre-push
+SKIP_TESTS=1 git push         # 跳过 pre-push 测试（仍跑 pre-commit）
+```
+
+> ⚠️ 跳过钩子后请尽快补跑测试并修复问题，否则可能引入线上 bug。
+
+---
+
 ## Bug 修复流程（强制）
 
 1. **修复前**：检查测试是否完整覆盖该功能点
@@ -9,12 +37,14 @@
 2. **修复 bug**
 3. **修复后**：跑通所有测试（绿灯）
    - `npx playwright test` 全部通过才能提交
+   - **pre-push 钩子会自动跑全量测试，确保不会漏跑**
 
 ## 代码修改流程（强制）
 
 1. **改代码前**：检查相关功能的测试是否完整
 2. **改代码后**：跑通所有测试
    - `npx playwright test` 全部通过才能提交
+   - **pre-commit 钩子会自动跑 tsc + eslint，防止编译错误漏网**
 3. **如果有测试失败**：先修测试或修代码，不允许跳过失败的测试
 
 ## 测试命令

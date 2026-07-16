@@ -132,3 +132,37 @@ Stage Summary:
 - 修复了 carousel 重构遗留的 TS 编译错误
 - 修正了 test 38 的错误断言
 - 总测试文件数：47（API 31 + UI 16）
+
+---
+Task ID: GIT-HOOKS-1
+Agent: main
+Task: 检查开发规范遵守情况，将 CLAUDE.md 中不严格遵守的规则写进 git hooks 强制执行
+
+Work Log:
+- 分析 CLAUDE.md 规则与对话历史，发现 4 类违规：
+  1. TS 编译错误漏网（carousel 重构后 3 个错误导致运行时崩溃）
+  2. 改 src 不更新 docs（16 个 commit 改了 src 但没更新 REQUIREMENTS.md）
+  3. UUID 格式 commit message（5 个 commit 用 UUID 当 message）
+  4. 测试不在提交前跑（多次提交后才发现测试失败）
+- 创建 scripts/hooks/pre-commit：tsc --noEmit + eslint + 文档/测试同步警告
+- 创建 scripts/hooks/commit-msg：禁止 UUID + 至少 10 字符 + 推荐 Conventional Commits
+- 创建 scripts/hooks/pre-push：全量 playwright test
+- 创建 scripts/setup-hooks.sh 安装脚本（可版本控制）
+- 修复历史遗留 TS 错误：
+  - src/lib/types.ts: Activity 接口补 specificDate/endDate/assignedToIds 字段
+  - src/lib/time-utils.ts: isActiveToday 补 endDate + isOnTime 修复 nowHHMM 调用
+  - 删除废弃的 src/app/api/init/route.ts
+- 修复 pre-commit 脚本 bug：grep 无匹配时返回非零导致 if 判断反了
+- 测试验证：
+  - pre-commit 成功阻止有 TS 错误的提交
+  - commit-msg 成功阻止 UUID 格式和过短 message
+  - 正常提交（有意义的 message + 无 TS 错误）全部通过
+- CLAUDE.md 顶部新增"Git Hooks 强制执行"章节，记录钩子行为和跳过方式
+
+Stage Summary:
+- 3 个 git hooks + setup 脚本已创建并测试通过
+- 4 类违规现在由钩子自动拦截，不再依赖人工自觉
+- 历史遗留 TS 错误已修复（12 个 → 0 个）
+- pre-commit: tsc + eslint 强制，docs/tests 同步警告
+- commit-msg: 禁止 UUID + 长度检查
+- pre-push: 全量测试强制
