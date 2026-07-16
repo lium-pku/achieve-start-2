@@ -137,6 +137,7 @@ export function isActiveToday(activity: {
   dayOfMonth: number | null
   specificDate: Date | null
   startDate: Date
+  endDate: Date | null
   active: boolean
 }, date: Date = new Date()): boolean {
   return isActiveOnDate(activity, date)
@@ -145,7 +146,9 @@ export function isActiveToday(activity: {
 // 判断活动当前是否还在按时窗口内
 export function isOnTime(activity: { deadline: string | null }, now: Date = new Date()): boolean {
   if (!activity.deadline) return true
-  return compareTime(nowHHMM(now), activity.deadline) <= 0
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  return compareTime(`${hh}:${mm}`, activity.deadline) <= 0
 }
 
 // 给成员加分（同时更新 totalPoints，并写入流水）

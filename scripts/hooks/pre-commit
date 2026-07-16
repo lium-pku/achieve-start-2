@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# pre-commit hook：提交前强制检查
+# 1. TypeScript 类型检查（tsc --noEmit）—— 防止编译错误漏网
+# 2. ESLint 代码规范检查
+# 3. 文档同步检查：改了 src/ 必须改 docs/REQUIREMENTS.md 或 tests/
+# 4. 测试同步检查：改了 src/ 必须改 tests/（或有明确理由跳过）
+#
+# 安装：scripts/setup-hooks.sh
+# 跳过：git commit --no-verify（不推荐，仅紧急情况）
+
+echo "🔍 pre-commit 检查开始..."
+
+# === 1. TypeScript 类型检查 ===
+echo "  [1/4] TypeScript 类型检查..."
+npx tsc --noEmit 2>&1 | grep -E "error TS" | grep -v "skills/\|stock-analysis" > /tmp/tsc-errors.txt || true
+error_count=$(wc -l < /tmp/tsc-errors.txt)
+if [ "$error_count" -eq 0 ]; then
+  echo "  ✅ TypeScript 检查通过"
+else
+  echo ""
+  cat /tmp/tsc-errors.txt | head -20
+  echo ""
+  echo "  ❌ TypeScript 有 $error_count 个错误（见上方），请修复后再提交"
+  echo "     提示：这些错误会导致运行时崩溃，不能跳过"
+  echo ""
+  echo "  如确需紧急跳过（不推荐）：git commit --no-verify"
+  exit 1
+fi
+
+# === 2. ESLint 检查 ===
+echo "  [2/4] ESLint 代码规范检查..."
+if npx eslint src/ --max-warnings 0 > /dev/null 2>&1; then
+  echo "  ✅ ESLint 检查通过"
+else
+  echo "  ❌ ESLint 检查失败，请运行 'npx eslint src/' 查看详情并修复"
+  echo "     如确需紧急跳过（不推荐）：git commit --no-verify"
+  exit 1
+fi
+
+# === 3. 文档同步检查 ===
+echo "  [3/4] 文档同步检查..."
+# 获取暂存区中改动的文件
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+src_changed=$(echo "$staged_files" | grep -c "^src/" || true)
+docs_changed=$(echo "$staged_files" | grep -c "^docs/" || true)
+
+if [ "$src_changed" -gt 0 ] && [ "$docs_changed" -eq 0 ]; then
+  echo "  ⚠️  警告：改了 $src_changed 个 src/ 文件，但没更新 docs/"
+  echo "     根据 CLAUDE.md 规则：需求变更必须同步更新 docs/REQUIREMENTS.md"
+  echo ""
+  echo "     如果这次改动不涉及需求变更（如纯 bug 修复、重构、测试补充），可忽略此警告"
+  echo "     如果涉及新功能或行为变更，请先更新文档再提交"
+  echo ""
+  # 警告但不阻止（bug 修复可能不需要改文档）
+  # 如需强制，把下一行注释去掉
+  # exit 1
+fi
+
+# === 4. 测试同步检查 ===
+echo "  [4/4] 测试同步检查..."
+tests_changed=$(echo "$staged_files" | grep -c "^tests/" || true)
+
+if [ "$src_changed" -gt 0 ] && [ "$tests_changed" -eq 0 ]; then
+  echo "  ⚠️  警告：改了 $src_changed 个 src/ 文件，但没更新 tests/"
+  echo "     根据 CLAUDE.md 规则：新增/修改组件必须有对应 UI 测试"
+  echo ""
+  echo "     如果这次改动是纯文档/配置/类型定义，可忽略此警告"
+  echo "     如果改了组件渲染逻辑或 API 行为，请先补测试再提交"
+  echo ""
+  # 警告但不阻止（类型定义/配置改动可能不需要测试）
+  # 如需强制，把下一行注释去掉
+  # exit 1
+fi
+
+echo ""
+echo "✅ pre-commit 检查全部通过"
+echo "   注意：pre-push 钩子会跑全量 Playwright 测试，请确保测试能过"
+exit 0

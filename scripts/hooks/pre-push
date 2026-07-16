@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# pre-push hook：推送前跑全量 Playwright 测试
+# 这是代码离开本地前的最后一道防线
+#
+# 安装：scripts/setup-hooks.sh
+# 跳过：SKIP_TESTS=1 git push（紧急情况，不推荐）
+#       git push --no-verify
+
+
+echo "🧪 pre-push：开始跑全量 Playwright 测试..."
+echo "   （47 个文件，~370 cases，预计 5-8 分钟）"
+echo ""
+
+# 检查是否跳过
+if [ "$SKIP_TESTS" = "1" ]; then
+  echo "⚠️  SKIP_TESTS=1，跳过测试"
+  echo "   注意：跳过测试推送可能导致 CI 失败或线上 bug"
+  echo "   请尽快补跑测试并修复问题"
+  exit 0
+fi
+
+# 确保 dev server 在运行（playwright.config.ts 会自动启动，但 reuseExistingServer 优先用已有的）
+if ! curl -s http://localhost:3000/api/health > /dev/null 2>&1; then
+  echo "  ℹ️  dev server 未运行，Playwright 会自动启动（webServer 配置）"
+fi
+
+# 跑测试
+start_time=$(date +%s)
+if npx playwright test --reporter=line 2>&1; then
+  end_time=$(date +%s)
+  duration=$((end_time - start_time))
+  echo ""
+  echo "✅ 全部测试通过（耗时 ${duration} 秒）"
+  echo "   可以安全推送"
+  exit 0
+else
+  end_time=$(date +%s)
+  duration=$((end_time - start_time))
+  echo ""
+  echo "❌ 测试失败（耗时 ${duration} 秒）"
+  echo ""
+  echo "   请修复失败的测试后再推送"
+  echo "   查看详情：npx playwright test --reporter=list"
+  echo ""
+  echo "   如确需紧急跳过（不推荐）："
+  echo "     SKIP_TESTS=1 git push"
+  echo "   或：git push --no-verify"
+  exit 1
+fi

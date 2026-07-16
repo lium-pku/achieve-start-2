@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# commit-msg hook：强制 commit message 规范
+# 规则：
+#   1. 禁止 UUID 格式（如 11714f8b-0c46-4808-9ee3-cc85c55d55dc）
+#   2. 必须有意义：至少 10 个字符
+#   3. 推荐格式：<type>: <description>（type 可选：feat/fix/docs/test/refactor/chore）
+#
+# 安装：scripts/setup-hooks.sh
+# 跳过：git commit --no-verify
+
+
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+first_line=$(echo "$commit_msg" | head -1)
+
+# === 1. 禁止 UUID 格式 ===
+# UUID 格式：8-4-4-4-12 十六进制
+if echo "$first_line" | grep -qE "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"; then
+  echo "❌ commit message 不能是 UUID 格式：$first_line"
+  echo ""
+  echo "   请使用有意义的描述，推荐格式："
+  echo "     feat: 新功能描述"
+  echo "     fix: 修复问题描述"
+  echo "     docs: 文档更新"
+  echo "     test: 测试补充"
+  echo "     refactor: 重构描述"
+  echo "     chore: 杂项"
+  echo ""
+  echo "   示例：feat: 日程日视图支持左右滑动切换日期"
+  echo ""
+  echo "   如确需跳过（不推荐）：git commit --no-verify"
+  exit 1
+fi
+
+# === 2. 长度检查 ===
+msg_len=${#first_line}
+if [ "$msg_len" -lt 10 ]; then
+  echo "❌ commit message 太短（$msg_len 字符），至少需要 10 个字符"
+  echo "   当前：$first_line"
+  echo ""
+  echo "   如确需跳过（不推荐）：git commit --no-verify"
+  exit 1
+fi
+
+# === 3. 推荐格式提醒（不阻止） ===
+if ! echo "$first_line" | grep -qE "^(feat|fix|docs|test|refactor|chore|style|perf|ci|build)(\(.+\))?: .+"; then
+  echo "💡 提示：推荐使用 Conventional Commits 格式"
+  echo "   当前：$first_line"
+  echo "   建议：feat: <描述> / fix: <描述> / docs: <描述> / test: <描述>"
+  echo "   （此为提醒，不阻止提交）"
+  echo ""
+fi
+
+exit 0

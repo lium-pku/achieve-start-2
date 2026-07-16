@@ -20,14 +20,17 @@ export interface Activity {
   scheduleType: ScheduleType
   dayOfWeek: number | null
   dayOfMonth: number | null
+  specificDate: string | null
   scheduledTime: string | null
   points: number
   onTimeBonus: number
   deadline: string | null
+  endDate: string | null
   active: boolean
   startDate: string
   createdById: string
   assignedToId: string | null
+  assignedToIds: string | null
   createdAt: string
   updatedAt: string
   createdBy?: Member
