@@ -1,33 +1,5 @@
 # 开发规则
 
-## Git Hooks 强制执行（自动安装）
-
-本项目通过 git hooks 自动强制执行以下规则，无需人工记忆：
-
-### 安装方式
-```bash
-bash scripts/setup-hooks.sh   # 首次 clone 或更新 hooks 后执行
-```
-
-### 钩子行为
-
-| 钩子 | 触发时机 | 检查内容 | 失败后果 |
-|------|----------|----------|----------|
-| **pre-commit** | `git commit` | ① `tsc --noEmit` 类型检查 ② `eslint` 代码规范 ③ 改 src/ 是否同步更新 docs/ ④ 改 src/ 是否同步更新 tests/ | 阻止提交（①②强制，③④警告） |
-| **commit-msg** | `git commit` | ① 禁止 UUID 格式 message ② 至少 10 字符 ③ 推荐 Conventional Commits 格式 | 阻止提交 |
-| **pre-push** | `git push` | 全量 `npx playwright test`（~5-8 分钟） | 阻止推送 |
-
-### 紧急跳过方式（不推荐）
-```bash
-git commit --no-verify        # 跳过 pre-commit + commit-msg
-git push --no-verify          # 跳过 pre-push
-SKIP_TESTS=1 git push         # 跳过 pre-push 测试（仍跑 pre-commit）
-```
-
-> ⚠️ 跳过钩子后请尽快补跑测试并修复问题，否则可能引入线上 bug。
-
----
-
 ## Bug 修复流程（强制）
 
 1. **修复前**：检查测试是否完整覆盖该功能点
@@ -37,20 +9,18 @@ SKIP_TESTS=1 git push         # 跳过 pre-push 测试（仍跑 pre-commit）
 2. **修复 bug**
 3. **修复后**：跑通所有测试（绿灯）
    - `npx playwright test` 全部通过才能提交
-   - **pre-push 钩子会自动跑全量测试，确保不会漏跑**
 
 ## 代码修改流程（强制）
 
 1. **改代码前**：检查相关功能的测试是否完整
 2. **改代码后**：跑通所有测试
    - `npx playwright test` 全部通过才能提交
-   - **pre-commit 钩子会自动跑 tsc + eslint，防止编译错误漏网**
 3. **如果有测试失败**：先修测试或修代码，不允许跳过失败的测试
 
 ## 测试命令
 
 ```bash
-# 跑全部测试（API + UI，47 个文件，~370 cases）
+# 跑全部测试（API + UI）
 npx playwright test
 
 # 跑单个测试文件
@@ -59,17 +29,11 @@ npx playwright test tests/01-checkin-verify.spec.ts
 # 跑指定流程
 npx playwright test -g "流程 1"
 
-# 只跑 UI 测试（32-46 号文件）
-npx playwright test tests/3[2-9]-ui- tests/4[0-6]-ui-
+# 只跑 UI 测试
+npx playwright test tests/3[2-9]-ui-
 
 # 只跑 API 测试（排除 UI 测试）
 npx playwright test --grep-invert "UI "
-
-# 跑滑动相关测试
-npx playwright test tests/40-ui-day-swipe.spec.ts
-
-# 跑 dialog 表单测试
-npx playwright test tests/41-ui-dialogs.spec.ts
 ```
 
 ## 测试覆盖检查清单（强制）
@@ -78,12 +42,12 @@ npx playwright test tests/41-ui-dialogs.spec.ts
 > 例如：API 返回 `pending_verification`，但前端没测 Badge 是否真的显示"待审核"。
 > 因此每个功能点必须**同时**覆盖以下两层：
 
-### 1. API 层测试（`tests/01-31-*.spec.ts` + `tests/47-api-*.spec.ts`）
+### 1. API 层测试（`tests/01-31-*.spec.ts`）
 - 用 `fetch` 直接调 API，验证返回值、状态变更、积分流水
 - 用 `tests/helpers.ts` 的 `api()`、`login()`、`resetAndSeed()` 等 helper
-- 验证后端业务逻辑（数据库状态、积分计算、权限、日期过滤边界）
+- 验证后端业务逻辑（数据库状态、积分计算、权限）
 
-### 2. UI 层测试（`tests/32-46-ui-*.spec.ts`）
+### 2. UI 层测试（`tests/32-39-ui-*.spec.ts`）
 - 用 Playwright `page` 操作浏览器，验证用户**看到什么、能点什么**
 - 用 `tests/ui-helpers.ts` 的 `uiLoginFast()`、`gotoTab()`、`switchMemberByUI()` 等 helper
 - 必须覆盖的 UI 行为：
@@ -91,12 +55,10 @@ npx playwright test tests/41-ui-dialogs.spec.ts
   - **状态条件渲染**：活动状态 Badge（待审核/已审核/已拒绝/已打卡）、奖励按钮文案（立即兑换/积分不足/兑换中）
   - **空状态/列表渲染**：无数据时的空状态提示（如"暂无待审核记录"）、列表项数量
   - **Tab/视图切换**：底部 5 个 Tab 切换、列表/网格视图切换、子 Tab 切换
-  - **弹窗交互**：对话框打开/关闭、确认弹窗、表单填写、编辑预填
+  - **弹窗交互**：对话框打开/关闭、确认弹窗、表单填写
   - **成员切换**：MemberSwitcher 下拉、家庭 Tab 卡片点击切换
   - **Toast 反馈**：成功/失败提示出现
   - **数据联动**：打卡后状态 Badge 即时变化、兑换后 pending 数量徽章变化
-  - **滑动交互**（v2.2.0）：日视图左右滑动切换日期、轮播 3-panel 结构、预加载验证
-  - **边缘场景**（v2.2.0）：token 失效回登录页、空数据不崩溃、多家庭隔离、网络错误
 
 ### 3. 双层覆盖判定
 **任何"用户可见的行为"都必须有 UI 测试，不能只靠 API 测试。**
@@ -162,10 +124,3 @@ npx playwright test tests/41-ui-dialogs.spec.ts
 - 文字可能不唯一时（如"已审核"既在"已审核积分"里也在统计卡片里），用 `{ exact: true }`
 - 用 `.card-pressable` 类定位活动卡片，避免 `div` filter 命中嵌套元素
 - 列表内多个相同按钮时，先定位父容器再 `.getByRole(...)`
-- **ToggleGroupItem 文字有空白**（如"日视图"、"周视图"）：用 `page.locator('button:has-text("周视图")')` 代替 `getByText('周视图', { exact: true })`
-- **Radix Select 下拉项在 portal 中渲染**：用 `page.locator('[role="option"]', { hasText: '进行中' })` 而非 `getByText('进行中')`
-- **`.or()` 链匹配多元素**：加 `.first()`，如 `getByText('空状态A').or(getByText('空状态B')).first()`
-- **对话框判定**：用 `getByRole('dialog')` 而非 `getByText('新建活动')`（标题文字可能因编辑/新建模式变化）
-- **滑动测试**：用 `element.evaluate()` dispatch `PointerEvent`（`pointerdown` / `pointermove` / `pointerup`），比 `page.mouse` 更可靠；分多步移动（10 步）确保 `pointermove` 触发
-- **轮播结构定位**：`.schedule-day-view` > `.schedule-day-carousel-track` > `.schedule-day-panel`（3 个面板）
-- **reload 后回到首页 Tab**：需重新 `gotoTab(page, 'xxx')` 回到目标 Tab

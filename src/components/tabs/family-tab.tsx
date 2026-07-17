@@ -5,8 +5,9 @@ import { Member, PointTransaction, ROLE_LABEL, api } from '@/lib/types'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, ChevronRight, History, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, Pencil, ChevronRight, History, TrendingUp, TrendingDown, Palette } from 'lucide-react'
 import { MemberDialog } from '@/components/dialogs/member-dialog'
+import { ThemePickerDialog } from '@/components/dialogs/theme-picker-dialog'
 import { useAppStore } from '@/lib/store'
 import { toast } from 'sonner'
 
@@ -34,6 +35,8 @@ const TX_TYPE_COLOR: Record<string, string> = {
 export function FamilyTab({ members, onChange }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Member | null>(null)
+  const [themePickerOpen, setThemePickerOpen] = useState(false)
+  const [themeEditing, setThemeEditing] = useState<Member | null>(null)
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<PointTransaction[]>([])
   const [loadingTx, setLoadingTx] = useState(false)
@@ -143,6 +146,22 @@ export function FamilyTab({ members, onChange }: Props) {
                   <Pencil className="w-3.5 h-3.5" />
                 </Button>
               )}
+              {/* 配色按钮：家长可改任意成员，孩子只能改自己 */}
+              {(isParentView || m.id === currentMemberId) && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 shrink-0"
+                  title="选择配色方案"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setThemeEditing(m)
+                    setThemePickerOpen(true)
+                  }}
+                >
+                  <Palette className="w-3.5 h-3.5" />
+                </Button>
+              )}
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </div>
           </Card>
@@ -230,6 +249,13 @@ export function FamilyTab({ members, onChange }: Props) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         member={editing}
+        onSaved={onChange}
+      />
+
+      <ThemePickerDialog
+        open={themePickerOpen}
+        onOpenChange={setThemePickerOpen}
+        member={themeEditing}
         onSaved={onChange}
       />
     </div>

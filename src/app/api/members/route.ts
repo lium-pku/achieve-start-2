@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   if (err) return err
 
   const body = await req.json()
-  const { name, role, avatar, color } = body
+  const { name, role, avatar, color, theme } = body
   if (!name || !role) return fail('缺少 name 或 role')
   if (!['child', 'mom', 'dad'].includes(role)) return fail('role 必须为 child/mom/dad')
 
@@ -31,6 +31,7 @@ export async function POST(req: Request) {
       role,
       avatar: avatar || (role === 'child' ? '🧒' : role === 'mom' ? '👩' : '👨'),
       color: color || (role === 'child' ? '#FF9A3C' : role === 'mom' ? '#EC4899' : '#10B981'),
+      theme: theme || 'orange',
     },
   })
   return NextResponse.json(member, { status: 201 })

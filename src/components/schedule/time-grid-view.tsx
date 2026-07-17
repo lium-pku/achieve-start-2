@@ -658,8 +658,8 @@ export function TimeGridView({
                 return a.dayOfWeek === td
               }
               if (a.scheduleType === 'monthly') return a.dayOfMonth === target.getDate()
-              if (a.scheduleType === 'once' && (a as any).specificDate) {
-                const spec = new Date((a as any).specificDate)
+              if (a.scheduleType === 'once' && a.specificDate) {
+                const spec = new Date(a.specificDate)
                 spec.setHours(0, 0, 0, 0)
                 return spec.getTime() === target.getTime()
               }

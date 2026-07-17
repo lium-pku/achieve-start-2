@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Member, Role, ROLE_LABEL, api } from '@/lib/types'
+import { THEME_PRESETS, guessThemeByColor } from '@/lib/themes'
 import { toast } from 'sonner'
 
 interface Props {
@@ -29,14 +30,13 @@ interface Props {
 }
 
 const AVATARS = ['🧒', '👦', '👧', '👶', '👩', '👨', '👵', '👴', '🧑', '👱']
-const COLORS = ['#FF9A3C', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#06B6D4', '#EF4444', '#6366F1']
 
 export function MemberDialog({ open, onOpenChange, member, onSaved }: Props) {
   const isEdit = !!member
   const [name, setName] = useState('')
   const [role, setRole] = useState<Role>('child')
   const [avatar, setAvatar] = useState('🧒')
-  const [color, setColor] = useState('#FF9A3C')
+  const [theme, setTheme] = useState('orange')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -45,12 +45,13 @@ export function MemberDialog({ open, onOpenChange, member, onSaved }: Props) {
         setName(member.name)
         setRole(member.role)
         setAvatar(member.avatar)
-        setColor(member.color)
+        // 优先用 member.theme，兼容旧数据用 color 反查
+        setTheme(member.theme || guessThemeByColor(member.color))
       } else {
         setName('')
         setRole('child')
         setAvatar('🧒')
-        setColor('#FF9A3C')
+        setTheme('orange')
       }
     }
   }, [open, member])
@@ -60,18 +61,20 @@ export function MemberDialog({ open, onOpenChange, member, onSaved }: Props) {
       toast.error('请填写姓名')
       return
     }
+    // 根据主题取 color（兼容旧 color 字段）
+    const preset = THEME_PRESETS.find((t) => t.key === theme) || THEME_PRESETS[0]
     setSaving(true)
     try {
       if (isEdit && member) {
         await api(`/api/members/${member.id}`, {
           method: 'PATCH',
-          body: JSON.stringify({ name: name.trim(), avatar, color }),
+          body: JSON.stringify({ name: name.trim(), avatar, color: preset.color, theme }),
         })
         toast.success('已更新')
       } else {
         await api('/api/members', {
           method: 'POST',
-          body: JSON.stringify({ name: name.trim(), role, avatar, color }),
+          body: JSON.stringify({ name: name.trim(), role, avatar, color: preset.color, theme }),
         })
         toast.success('已添加')
       }
@@ -137,18 +140,23 @@ export function MemberDialog({ open, onOpenChange, member, onSaved }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label>主题色</Label>
-            <div className="flex gap-2 flex-wrap">
-              {COLORS.map((c) => (
+            <Label>主题色（影响整个 App 配色）</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {THEME_PRESETS.map((t) => (
                 <button
-                  key={c}
+                  key={t.key}
                   type="button"
-                  onClick={() => setColor(c)}
-                  className={`w-8 h-8 rounded-full border-2 transition-transform ${
-                    color === c ? 'border-foreground scale-110' : 'border-transparent'
+                  onClick={() => setTheme(t.key)}
+                  className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all ${
+                    theme === t.key ? 'border-foreground scale-105' : 'border-transparent bg-muted hover:bg-muted/80'
                   }`}
-                  style={{ background: c }}
-                />
+                >
+                  <span
+                    className="w-6 h-6 rounded-full shrink-0"
+                    style={{ background: t.color }}
+                  />
+                  <span className="text-xs font-medium truncate">{t.emoji} {t.name}</span>
+                </button>
               ))}
             </div>
           </div>
@@ -157,7 +165,7 @@ export function MemberDialog({ open, onOpenChange, member, onSaved }: Props) {
           <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
             <span
               className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
-              style={{ background: color + '22' }}
+              style={{ background: (THEME_PRESETS.find((t) => t.key === theme) || THEME_PRESETS[0]).color + '22' }}
             >
               {avatar}
             </span>

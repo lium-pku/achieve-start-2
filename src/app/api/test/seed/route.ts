@@ -34,16 +34,16 @@ export async function POST(req: Request) {
 
   // ③ 创建默认成员（前面已删全部）
   const child = await db.member.create({
-    data: { familyId, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C' },
+    data: { familyId, name: '小宇', role: 'child', avatar: '🧒', color: '#FF9A3C', theme: 'orange' },
   })
   const child2 = await db.member.create({
-    data: { familyId, name: '小苒', role: 'child', avatar: '👧', color: '#8B5CF6' },
+    data: { familyId, name: '小苒', role: 'child', avatar: '👧', color: '#8B5CF6', theme: 'purple' },
   })
   const mom = await db.member.create({
-    data: { familyId, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899' },
+    data: { familyId, name: '妈妈', role: 'mom', avatar: '👩', color: '#EC4899', theme: 'pink' },
   })
   const dad = await db.member.create({
-    data: { familyId, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981' },
+    data: { familyId, name: '爸爸', role: 'dad', avatar: '👨', color: '#10B981', theme: 'green' },
   })
 
   // 重新关联 User.memberId（按角色匹配，孩子关联第一个孩子）

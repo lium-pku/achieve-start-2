@@ -6,8 +6,6 @@ import { getContext, requireParent } from '@/lib/auth'
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const ctx = getContext(req)
-  const err = requireParent(ctx)
-  if (err) return err
 
   // 确认 member 属于当前 family
   const existing = await db.member.findFirst({
@@ -16,6 +14,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!existing) return fail('成员不存在或无权访问', 404)
 
   const body = await req.json()
+
+  // 权限判断：
+  // - 改 totalPoints / name / avatar / color → 仅家长（requireParent）
+  // - 改 theme（自己的配色）→ 家长或自己（孩子可以改自己的主题）
+  const isThemeOnlyUpdate =
+    body.theme !== undefined &&
+    body.name === undefined &&
+    body.avatar === undefined &&
+    body.color === undefined &&
+    body.totalPoints === undefined
+
+  if (!isThemeOnlyUpdate) {
+    const err = requireParent(ctx)
+    if (err) return err
+  } else {
+    // theme-only 更新：家长可改任意成员，孩子只能改自己
+    const isParent = ctx.role === 'mom' || ctx.role === 'dad'
+    const isSelf = ctx.memberId === id
+    if (!isParent && !isSelf) {
+      return fail('只能修改自己的配色方案', 403)
+    }
+  }
 
   // 如果是改 totalPoints，写一条 adjust 流水记录差额
   if (body.totalPoints !== undefined) {
@@ -40,6 +60,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(body.name !== undefined && { name: body.name }),
       ...(body.avatar !== undefined && { avatar: body.avatar }),
       ...(body.color !== undefined && { color: body.color }),
+      ...(body.theme !== undefined && { theme: body.theme }),
       ...(body.totalPoints !== undefined && { totalPoints: body.totalPoints }),
     },
   })

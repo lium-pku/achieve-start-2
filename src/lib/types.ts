@@ -10,6 +10,7 @@ export interface Member {
   role: Role
   avatar: string
   color: string
+  theme: string
   totalPoints: number
 }
 

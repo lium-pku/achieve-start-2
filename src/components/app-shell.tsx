@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
 import { api, Member } from '@/lib/types'
+import { applyTheme, clearTheme, guessThemeByColor } from '@/lib/themes'
 import { HomeTab } from '@/components/tabs/home-tab'
 import { ScheduleTab } from '@/components/tabs/schedule-tab'
 import { RewardsTab } from '@/components/tabs/rewards-tab'
@@ -73,8 +74,20 @@ export function AppShell() {
     }
   }, [token, members, currentMember, user, setCurrentMember])
 
+  // 根据当前成员的主题切换 app 配色
+  useEffect(() => {
+    if (currentMember) {
+      // 优先用 theme 字段，兼容旧数据用 color 反查
+      const themeKey = currentMember.theme || guessThemeByColor(currentMember.color)
+      applyTheme(themeKey)
+    } else {
+      clearTheme()
+    }
+  }, [currentMember])
+
   // 未登录 → 显示登录页
   if (!token) {
+    clearTheme()
     return <LoginDialog onLoginSuccess={() => setLoading(true)} />
   }
 
